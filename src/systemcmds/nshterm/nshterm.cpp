@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 /**
- * @file nshterm.cpp
+ * @file nshterm.c
  */
 
 #include <px4_platform_common/px4_config.h>

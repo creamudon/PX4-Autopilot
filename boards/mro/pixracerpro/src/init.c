@@ -195,7 +195,5 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	sdio_mediachange(sdio_dev, true);
 #endif /* CONFIG_MMCSD */
 
-	px4_platform_configure();
-
 	return OK;
 }

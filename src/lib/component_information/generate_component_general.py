@@ -20,7 +20,7 @@ version_file = args.version_file
 version_dir = ''
 if version_file is not None:
     for line in open(version_file, "r"):
-        version_search = re.search(r'PX4_GIT_TAG_OR_BRANCH_NAME\s+"(.+)"', line)
+        version_search = re.search('PX4_GIT_TAG_OR_BRANCH_NAME\s+"(.+)"', line)
         if version_search:
             version_dir = version_search.group(1)
             break
@@ -74,7 +74,7 @@ for metadata_type_tuple in args.type:
 component_general['metadataTypes'] = metadata_types
 
 with open(filename, 'w') as outfile:
-    json.dump(component_general, outfile, sort_keys=True)
+    json.dump(component_general, outfile)
 
 if compress:
     save_compressed(filename)

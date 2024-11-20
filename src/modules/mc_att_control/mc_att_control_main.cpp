@@ -49,8 +49,6 @@
 #include <mathlib/math/Limits.hpp>
 #include <mathlib/math/Functions.hpp>
 
-#include "AttitudeControl/AttitudeControlMath.hpp"
-
 using namespace matrix;
 
 MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
@@ -60,11 +58,15 @@ MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
 	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")),
 	_vtol(vtol)
 {
+	if (_vtol) {
+		int32_t vt_type = -1;
+
+		if (param_get(param_find("VT_TYPE"), &vt_type) == PX4_OK) {
+			_vtol_tailsitter = (static_cast<vtol_type>(vt_type) == vtol_type::TAILSITTER);
+		}
+	}
+
 	parameters_updated();
-	// Rate of change 5% per second -> 1.6 seconds to ramp to default 8% MPC_MANTHR_MIN
-	_manual_throttle_minimum.setSlewRate(0.05f);
-	// Rate of change 50% per second -> 2 seconds to ramp to 100%
-	_manual_throttle_maximum.setSlewRate(0.5f);
 }
 
 MulticopterAttitudeControl::~MulticopterAttitudeControl()
@@ -101,21 +103,18 @@ MulticopterAttitudeControl::parameters_updated()
 float
 MulticopterAttitudeControl::throttle_curve(float throttle_stick_input)
 {
-	float thrust = 0.f;
+	const float throttle_min = _landed ? 0.0f : _param_mpc_manthr_min.get();
 
+	// throttle_stick_input is in range [0, 1]
 	switch (_param_mpc_thr_curve.get()) {
 	case 1: // no rescaling to hover throttle
-		thrust = math::interpolate(throttle_stick_input, -1.f, 1.f,
-					   _manual_throttle_minimum.getState(), _param_mpc_thr_max.get());
-		break;
+		return throttle_min + throttle_stick_input * (_param_mpc_thr_max.get() - throttle_min);
 
-	default: // 0 or other: rescale such that a centered throttle stick corresponds to hover throttle
-		thrust = math::interpolateNXY(throttle_stick_input, {-1.f, 0.f, 1.f},
-		{_manual_throttle_minimum.getState(), _param_mpc_thr_hover.get(), _param_mpc_thr_max.get()});
-		break;
+	default: // 0 or other: rescale to hover throttle at 0.5 stick
+		return math::gradual3(throttle_stick_input,
+				      0.f, .5f, 1.f,
+				      throttle_min, _param_mpc_thr_hover.get(), _param_mpc_thr_max.get());
 	}
-
-	return math::min(thrust, _manual_throttle_maximum.getState());
 }
 
 void
@@ -124,18 +123,15 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt,
 	vehicle_attitude_setpoint_s attitude_setpoint{};
 	const float yaw = Eulerf(q).psi();
 
-	attitude_setpoint.yaw_sp_move_rate = _manual_control_setpoint.yaw * math::radians(_param_mpc_man_y_max.get());
-
-	// Avoid accumulating absolute yaw error with arming stick gesture in case heading_good_for_control stays true
-	if ((_manual_control_setpoint.throttle < -.9f) && (_param_mc_airmode.get() != 2)) {
-		reset_yaw_sp = true;
-	}
-
-	// Make sure not absolute heading error builds up
+	/* reset yaw setpoint to current position if needed */
 	if (reset_yaw_sp) {
 		_man_yaw_sp = yaw;
 
-	} else {
+	} else if (math::constrain(_manual_control_setpoint.z, 0.0f, 1.0f) > 0.05f
+		   || _param_mc_airmode.get() == (int32_t)Mixer::Airmode::roll_pitch_yaw) {
+
+		const float yaw_rate = math::radians(_param_mpc_man_y_max.get());
+		attitude_setpoint.yaw_sp_move_rate = _manual_control_setpoint.r * yaw_rate;
 		_man_yaw_sp = wrap_pi(_man_yaw_sp + attitude_setpoint.yaw_sp_move_rate * dt);
 	}
 
@@ -143,49 +139,87 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt,
 	 * Input mapping for roll & pitch setpoints
 	 * ----------------------------------------
 	 * We control the following 2 angles:
-	 * - tilt angle, given by sqrt(roll*roll + pitch*pitch)
+	 * - tilt angle, given by sqrt(x*x + y*y)
 	 * - the direction of the maximum tilt in the XY-plane, which also defines the direction of the motion
 	 *
 	 * This allows a simple limitation of the tilt angle, the vehicle flies towards the direction that the stick
 	 * points to, and changes of the stick input are linear.
 	 */
-	_man_roll_input_filter.setParameters(dt, _param_mc_man_tilt_tau.get());
-	_man_pitch_input_filter.setParameters(dt, _param_mc_man_tilt_tau.get());
+	_man_x_input_filter.setParameters(dt, _param_mc_man_tilt_tau.get());
+	_man_y_input_filter.setParameters(dt, _param_mc_man_tilt_tau.get());
+	_man_x_input_filter.update(_manual_control_setpoint.x * _man_tilt_max);
+	_man_y_input_filter.update(_manual_control_setpoint.y * _man_tilt_max);
+	const float x = _man_x_input_filter.getState();
+	const float y = _man_y_input_filter.getState();
 
-	// we want to fly towards the direction of (roll, pitch)
-	Vector2f v = Vector2f(_man_roll_input_filter.update(_manual_control_setpoint.roll * _man_tilt_max),
-			      -_man_pitch_input_filter.update(_manual_control_setpoint.pitch * _man_tilt_max));
+	// we want to fly towards the direction of (x, y), so we use a perpendicular axis angle vector in the XY-plane
+	Vector2f v = Vector2f(y, -x);
 	float v_norm = v.norm(); // the norm of v defines the tilt angle
 
 	if (v_norm > _man_tilt_max) { // limit to the configured maximum tilt angle
 		v *= _man_tilt_max / v_norm;
 	}
 
-	Quatf q_sp_rp = AxisAnglef(v(0), v(1), 0.f);
+	Quatf q_sp_rpy = AxisAnglef(v(0), v(1), 0.f);
+	Eulerf euler_sp = q_sp_rpy;
+	attitude_setpoint.roll_body = euler_sp(0);
+	attitude_setpoint.pitch_body = euler_sp(1);
 	// The axis angle can change the yaw as well (noticeable at higher tilt angles).
 	// This is the formula by how much the yaw changes:
 	//   let a := tilt angle, b := atan(y/x) (direction of maximum tilt)
 	//   yaw = atan(-2 * sin(b) * cos(b) * sin^2(a/2) / (1 - 2 * cos^2(b) * sin^2(a/2))).
-	const Quatf q_sp_yaw(cosf(_man_yaw_sp / 2.f), 0.f, 0.f, sinf(_man_yaw_sp / 2.f));
+	attitude_setpoint.yaw_body = _man_yaw_sp + euler_sp(2);
 
+	/* modify roll/pitch only if we're a VTOL */
 	if (_vtol) {
-		// Modify the setpoints for roll and pitch such that they reflect the user's intention even
-		// if a large yaw error(yaw_sp - yaw) is present. In the presence of a yaw error constructing
-		// an attitude setpoint from the yaw setpoint will lead to unexpected attitude behaviour from
-		// the user's view as the tilt will not be aligned with the heading of the vehicle.
+		// Construct attitude setpoint rotation matrix. Modify the setpoints for roll
+		// and pitch such that they reflect the user's intention even if a large yaw error
+		// (yaw_sp - yaw) is present. In the presence of a yaw error constructing a rotation matrix
+		// from the pure euler angle setpoints will lead to unexpected attitude behaviour from
+		// the user's view as the euler angle sequence uses the  yaw setpoint and not the current
+		// heading of the vehicle.
+		// However there's also a coupling effect that causes oscillations for fast roll/pitch changes
+		// at higher tilt angles, so we want to avoid using this on multicopters.
+		// The effect of that can be seen with:
+		// - roll/pitch into one direction, keep it fixed (at high angle)
+		// - apply a fast yaw rotation
+		// - look at the roll and pitch angles: they should stay pretty much the same as when not yawing
 
-		AttitudeControlMath::correctTiltSetpointForYawError(q_sp_rp, q, q_sp_yaw);
+		// calculate our current yaw error
+		float yaw_error = wrap_pi(attitude_setpoint.yaw_body - yaw);
+
+		// compute the vector obtained by rotating a z unit vector by the rotation
+		// given by the roll and pitch commands of the user
+		Vector3f zB = {0.0f, 0.0f, 1.0f};
+		Dcmf R_sp_roll_pitch = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, 0.0f);
+		Vector3f z_roll_pitch_sp = R_sp_roll_pitch * zB;
+
+		// transform the vector into a new frame which is rotated around the z axis
+		// by the current yaw error. this vector defines the desired tilt when we look
+		// into the direction of the desired heading
+		Dcmf R_yaw_correction = Eulerf(0.0f, 0.0f, -yaw_error);
+		z_roll_pitch_sp = R_yaw_correction * z_roll_pitch_sp;
+
+		// use the formula z_roll_pitch_sp = R_tilt * [0;0;1]
+		// R_tilt is computed from_euler; only true if cos(roll) not equal zero
+		// -> valid if roll is not +-pi/2;
+		attitude_setpoint.roll_body = -asinf(z_roll_pitch_sp(1));
+		attitude_setpoint.pitch_body = atan2f(z_roll_pitch_sp(0), z_roll_pitch_sp(2));
 	}
 
-	// Align the desired tilt with the yaw setpoint
-	Quatf q_sp = q_sp_yaw * q_sp_rp;
-
+	/* copy quaternion setpoint to attitude setpoint topic */
+	Quatf q_sp = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, attitude_setpoint.yaw_body);
 	q_sp.copyTo(attitude_setpoint.q_d);
 
-	attitude_setpoint.thrust_body[2] = -throttle_curve(_manual_control_setpoint.throttle);
-
+	attitude_setpoint.thrust_body[2] = -throttle_curve(math::constrain(_manual_control_setpoint.z, 0.f, 1.f));
 	attitude_setpoint.timestamp = hrt_absolute_time();
+
 	_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
+
+	// update attitude controller setpoint immediately
+	_attitude_control.setAttitudeSetpoint(q_sp, attitude_setpoint.yaw_sp_move_rate);
+	_thrust_setpoint_body = Vector3f(attitude_setpoint.thrust_body);
+	_last_attitude_setpoint = attitude_setpoint.timestamp;
 }
 
 void
@@ -220,23 +254,37 @@ MulticopterAttitudeControl::Run()
 
 		const Quatf q{v_att.q};
 
-		/* check for updates in other topics */
-		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
-		_vehicle_control_mode_sub.update(&_vehicle_control_mode);
+		// Check for new attitude setpoint
+		if (_vehicle_attitude_setpoint_sub.updated()) {
+			vehicle_attitude_setpoint_s vehicle_attitude_setpoint;
 
-		if (_vehicle_status_sub.updated()) {
-			vehicle_status_s vehicle_status;
+			if (_vehicle_attitude_setpoint_sub.copy(&vehicle_attitude_setpoint)
+			    && (vehicle_attitude_setpoint.timestamp > _last_attitude_setpoint)) {
 
-			if (_vehicle_status_sub.copy(&vehicle_status)) {
-				_vehicle_type_rotary_wing = (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
-				_vtol = vehicle_status.is_vtol;
-				_vtol_in_transition_mode = vehicle_status.in_transition_mode;
-				_vtol_tailsitter = vehicle_status.is_vtol_tailsitter;
-
-				const bool armed = (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
-				_spooled_up = armed && hrt_elapsed_time(&vehicle_status.armed_time) > _param_com_spoolup_time.get() * 1_s;
+				_attitude_control.setAttitudeSetpoint(Quatf(vehicle_attitude_setpoint.q_d), vehicle_attitude_setpoint.yaw_sp_move_rate);
+				_thrust_setpoint_body = Vector3f(vehicle_attitude_setpoint.thrust_body);
+				_last_attitude_setpoint = vehicle_attitude_setpoint.timestamp;
 			}
 		}
+
+		// Check for a heading reset
+		if (_quat_reset_counter != v_att.quat_reset_counter) {
+			const Quatf delta_q_reset(v_att.delta_q_reset);
+
+			// for stabilized attitude generation only extract the heading change from the delta quaternion
+			_man_yaw_sp = wrap_pi(_man_yaw_sp + Eulerf(delta_q_reset).psi());
+
+			if (v_att.timestamp > _last_attitude_setpoint) {
+				// adapt existing attitude setpoint unless it was generated after the current attitude estimate
+				_attitude_control.adaptAttitudeSetpoint(delta_q_reset);
+			}
+
+			_quat_reset_counter = v_att.quat_reset_counter;
+		}
+
+		/* check for updates in other topics */
+		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
+		_v_control_mode_sub.update(&_v_control_mode);
 
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
@@ -246,11 +294,13 @@ MulticopterAttitudeControl::Run()
 			}
 		}
 
-		if (_vehicle_local_position_sub.updated()) {
-			vehicle_local_position_s vehicle_local_position;
+		if (_vehicle_status_sub.updated()) {
+			vehicle_status_s vehicle_status;
 
-			if (_vehicle_local_position_sub.copy(&vehicle_local_position)) {
-				_heading_good_for_control = vehicle_local_position.heading_good_for_control;
+			if (_vehicle_status_sub.copy(&vehicle_status)) {
+				_vehicle_type_rotary_wing = (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
+				_vtol = vehicle_status.is_vtol;
+				_vtol_in_transition_mode = vehicle_status.in_transition_mode;
 			}
 		}
 
@@ -261,51 +311,22 @@ MulticopterAttitudeControl::Run()
 		// vehicle is a tailsitter in transition mode
 		const bool is_tailsitter_transition = (_vtol_tailsitter && _vtol_in_transition_mode);
 
-		const bool run_att_ctrl = _vehicle_control_mode.flag_control_attitude_enabled && (is_hovering
-					  || is_tailsitter_transition);
+		bool run_att_ctrl = _v_control_mode.flag_control_attitude_enabled && (is_hovering || is_tailsitter_transition);
 
 		if (run_att_ctrl) {
 
 			// Generate the attitude setpoint from stick inputs if we are in Manual/Stabilized mode
-			if (_vehicle_control_mode.flag_control_manual_enabled &&
-			    !_vehicle_control_mode.flag_control_altitude_enabled &&
-			    !_vehicle_control_mode.flag_control_velocity_enabled &&
-			    !_vehicle_control_mode.flag_control_position_enabled) {
+			if (_v_control_mode.flag_control_manual_enabled &&
+			    !_v_control_mode.flag_control_altitude_enabled &&
+			    !_v_control_mode.flag_control_velocity_enabled &&
+			    !_v_control_mode.flag_control_position_enabled) {
 
 				generate_attitude_setpoint(q, dt, _reset_yaw_sp);
 				attitude_setpoint_generated = true;
 
 			} else {
-				_man_roll_input_filter.reset(0.f);
-				_man_pitch_input_filter.reset(0.f);
-			}
-
-			// Check for new attitude setpoint
-			if (_vehicle_attitude_setpoint_sub.updated()) {
-				vehicle_attitude_setpoint_s vehicle_attitude_setpoint;
-
-				if (_vehicle_attitude_setpoint_sub.copy(&vehicle_attitude_setpoint)
-				    && (vehicle_attitude_setpoint.timestamp > _last_attitude_setpoint)) {
-
-					_attitude_control.setAttitudeSetpoint(Quatf(vehicle_attitude_setpoint.q_d), vehicle_attitude_setpoint.yaw_sp_move_rate);
-					_thrust_setpoint_body = Vector3f(vehicle_attitude_setpoint.thrust_body);
-					_last_attitude_setpoint = vehicle_attitude_setpoint.timestamp;
-				}
-			}
-
-			// Check for a heading reset
-			if (_quat_reset_counter != v_att.quat_reset_counter) {
-				const Quatf delta_q_reset(v_att.delta_q_reset);
-
-				// for stabilized attitude generation only extract the heading change from the delta quaternion
-				_man_yaw_sp = wrap_pi(_man_yaw_sp + Eulerf(delta_q_reset).psi());
-
-				if (v_att.timestamp > _last_attitude_setpoint) {
-					// adapt existing attitude setpoint unless it was generated after the current attitude estimate
-					_attitude_control.adaptAttitudeSetpoint(delta_q_reset);
-				}
-
-				_quat_reset_counter = v_att.quat_reset_counter;
+				_man_x_input_filter.reset(0.f);
+				_man_y_input_filter.reset(0.f);
 			}
 
 			Vector3f rates_sp = _attitude_control.update(q);
@@ -324,33 +345,19 @@ MulticopterAttitudeControl::Run()
 			}
 
 			// publish rate setpoint
-			vehicle_rates_setpoint_s rates_setpoint{};
-			rates_setpoint.roll = rates_sp(0);
-			rates_setpoint.pitch = rates_sp(1);
-			rates_setpoint.yaw = rates_sp(2);
-			_thrust_setpoint_body.copyTo(rates_setpoint.thrust_body);
-			rates_setpoint.timestamp = hrt_absolute_time();
+			vehicle_rates_setpoint_s v_rates_sp{};
+			v_rates_sp.roll = rates_sp(0);
+			v_rates_sp.pitch = rates_sp(1);
+			v_rates_sp.yaw = rates_sp(2);
+			_thrust_setpoint_body.copyTo(v_rates_sp.thrust_body);
+			v_rates_sp.timestamp = hrt_absolute_time();
 
-			_vehicle_rates_setpoint_pub.publish(rates_setpoint);
-		}
-
-		if (_landed) {
-			_manual_throttle_minimum.update(0.f, dt);
-
-		} else {
-			_manual_throttle_minimum.update(_param_mpc_manthr_min.get(), dt);
-		}
-
-		if (_spooled_up) {
-			_manual_throttle_maximum.update(1.f, dt);
-
-		} else {
-			_manual_throttle_maximum.setForcedValue(0.f);
+			_v_rates_sp_pub.publish(v_rates_sp);
 		}
 
 		// reset yaw setpoint during transitions, tailsitter.cpp generates
 		// attitude setpoint for the transition
-		_reset_yaw_sp = !attitude_setpoint_generated || !_heading_good_for_control || (_vtol && _vtol_in_transition_mode);
+		_reset_yaw_sp = !attitude_setpoint_generated || _landed || (_vtol && _vtol_in_transition_mode);
 	}
 
 	perf_end(_loop_perf);
@@ -423,11 +430,7 @@ https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/154099/eth
 	return 0;
 }
 
-
-/**
- * Multicopter attitude control app start / stop handling function
- */
-extern "C" __EXPORT int mc_att_control_main(int argc, char *argv[])
+int mc_att_control_main(int argc, char *argv[])
 {
 	return MulticopterAttitudeControl::main(argc, argv);
 }

@@ -31,18 +31,12 @@
 #
 ############################################################################
 
-if(CONFIG_ARCH_CHIP_STM32H7)
-	set(FLASHFS_SOURCE_FILE flashfs32.c)
-else()
-	set(FLASHFS_SOURCE_FILE flashfs.c)
-endif()
-
 add_library(flashparams
-	${FLASHFS_SOURCE_FILE}
+	flashfs.c
 	flashparams.cpp
 )
 
-add_dependencies(flashparams prebuild_targets parameters_header)
+add_dependencies(flashparams prebuild_targets)
 target_compile_definitions(flashparams PRIVATE -DMODULE_NAME="flashparams")
 target_compile_options(flashparams
 	PRIVATE

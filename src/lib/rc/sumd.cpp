@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /*
- * @file sumd.cpp
+ * @file sumd.h
  *
  * RC protocol definition for Graupner HoTT transmitter (SUMD/SUMH Protocol)
  *

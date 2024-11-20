@@ -1,0 +1,5 @@
+menuconfig DRIVERS_DISTANCE_SENSOR_DWM1000
+	bool "dwm1000"
+	default n
+	---help---
+		Enable support for dwm1000

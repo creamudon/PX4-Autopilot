@@ -55,16 +55,6 @@ endif()
 # build NuttX
 add_subdirectory(NuttX ${PX4_BINARY_DIR}/NuttX)
 
-# check that CONFIG_ARCH_BOARD_CUSTOM_DIR is in PX4_BOARD_DIR
-if(CONFIG_ARCH_BOARD_CUSTOM_DIR_RELPATH)
-	get_filename_component(nuttx_defconfig_root "${NUTTX_DEFCONFIG}/../.." ABSOLUTE)
-	get_filename_component(nuttx_config_from_defconfig "${NUTTX_DIR}/${CONFIG_ARCH_BOARD_CUSTOM_DIR}" ABSOLUTE)
-
-	if(NOT ${nuttx_defconfig_root} MATCHES ${nuttx_config_from_defconfig})
-		message(FATAL_ERROR "NuttX custom board directory (${CONFIG_ARCH_BOARD_CUSTOM_DIR}) isn't in board directory (${PX4_BOARD_DIR})")
-	endif()
-endif()
-
 set(nuttx_libs)
 set(SCRIPT_PREFIX)
 if("${PX4_BOARD_LABEL}" STREQUAL "bootloader")
@@ -175,6 +165,7 @@ if (NOT CONFIG_BUILD_FLAT)
 		-Wl,--start-group
 			${nuttx_libs}
 			${kernel_module_libraries}
+			px4_work_queue # TODO, this shouldn't be needed here?
 		-Wl,--end-group
 
 		m
@@ -266,7 +257,6 @@ else()
 		-fno-exceptions
 		-fno-rtti
 		-Wl,--script=${NUTTX_CONFIG_DIR_CYG}/scripts/${SCRIPT_PREFIX}script.ld
-		-L${NUTTX_CONFIG_DIR_CYG}/scripts
 		-Wl,-Map=${PX4_CONFIG}.map
 		-Wl,--warn-common
 		-Wl,--gc-sections
@@ -294,29 +284,6 @@ else()
 		COMMAND ${CMAKE_OBJCOPY} -O binary ${PX4_BINARY_DIR_REL}/${FW_NAME} ${PX4_BINARY_OUTPUT}
 		DEPENDS px4
 	)
-
-endif()
-
-# create .hex if configured in NuttX
-if (CONFIG_INTELHEX_BINARY)
-
-	string(REPLACE ".elf" ".hex" hex_package ${PX4_BINARY_DIR}/${FW_NAME})
-
-	add_custom_command(
-		OUTPUT ${hex_package}
-		COMMAND
-			${CMAKE_OBJCOPY} -O ihex
-			${PX4_BINARY_DIR}/${PX4_CONFIG}.elf
-			${hex_package}
-		DEPENDS
-			${PX4_BINARY_DIR}/${PX4_CONFIG}.bin
-			airframes_xml
-			parameters_xml
-		COMMENT "Creating ${hex_package}"
-		WORKING_DIRECTORY ${PX4_BINARY_DIR}
-		)
-
-	add_custom_target(px4_hex ALL DEPENDS ${hex_package})
 
 endif()
 
@@ -350,21 +317,6 @@ if (TARGET parameters_xml AND TARGET airframes_xml)
 		include(upload)
 	endif()
 
-endif()
-
-if(${CONFIG_NSH_LIBRARY} MATCHES "y")
-	if(${CONFIG_NSH_DISABLE_ECHO} MATCHES "y")
-		message(FATAL_ERROR "init scripts require NSH SET (board has CONFIG_NSH_DISABLE_ECHO=y)")
-	endif()
-	if(${CONFIG_NSH_DISABLE_SET} MATCHES "y")
-		message(FATAL_ERROR "init scripts require NSH SET (board has CONFIG_NSH_DISABLE_SET=y)")
-	endif()
-	if(${CONFIG_NSH_DISABLE_SLEEP} MATCHES "y")
-		message(FATAL_ERROR "init scripts require NSH SET (board has CONFIG_NSH_DISABLE_SLEEP=y)")
-	endif()
-	if(${CONFIG_NSH_DISABLE_SOURCE} MATCHES "y")
-		message(FATAL_ERROR "init scripts require NSH SET (board has CONFIG_NSH_DISABLE_SOURCE=y)")
-	endif()
 endif()
 
 if("${PX4_BOARD_LABEL}" STREQUAL "bootloader")
@@ -406,16 +358,10 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/gdbinit.in ${PX4_BINARY_DIR}/.g
 if(NOT NUTTX_DIR MATCHES "external")
 	if(CONFIG_ARCH_CHIP_MIMXRT1062DVL6A)
 		set(DEBUG_DEVICE "MIMXRT1062XXX6A")
-		set(DEBUG_SVD_FILE "MIMXRT1062.xml")
-	elseif(CONFIG_ARCH_CHIP_MIMXRT1176DVMAA)
-		set(DEBUG_DEVICE "MIMXRT1176DVMAA")
-		set(DEBUG_SVD_FILE "MIMXRT1176_cm7.xml")
+		set(DEBUG_SVD_FILE "MIMXRT1052.svd")
 	elseif(CONFIG_ARCH_CHIP_MK66FN2M0VMD18)
 		set(DEBUG_DEVICE "MK66FN2M0xxx18")
 		set(DEBUG_SVD_FILE "MK66F18.svd")
-	elseif(CONFIG_ARCH_CHIP_S32K344)
-		set(DEBUG_DEVICE "S32K344")
-		set(DEBUG_SVD_FILE "S32K344_M7.svd")
 	elseif(CONFIG_ARCH_CHIP_STM32F100C8)
 		set(DEBUG_DEVICE "STM32F100C8")
 		set(DEBUG_SVD_FILE "STM32F100xx.svd")
@@ -458,9 +404,6 @@ if(NOT NUTTX_DIR MATCHES "external")
 	elseif(CONFIG_ARCH_CHIP_STM32F777NI)
 		set(DEBUG_DEVICE "STM32F777NI")
 		set(DEBUG_SVD_FILE "STM32F7x7.svd")
-	elseif(CONFIG_ARCH_CHIP_STM32H743VI)
-		set(DEBUG_DEVICE "STM32H743VI")
-		set(DEBUG_SVD_FILE "STM32H7x3.svd")
 	elseif(CONFIG_ARCH_CHIP_STM32H743II)
 		set(DEBUG_DEVICE "STM32H743II")
 		set(DEBUG_SVD_FILE "STM32H7x3.svd")
@@ -481,27 +424,7 @@ if(NOT NUTTX_DIR MATCHES "external")
 	file(GLOB_RECURSE DEBUG_SVD_FILE_PATH
 		LIST_DIRECTORIES false
 		${CMAKE_SOURCE_DIR}/../cmsis-svd/data/*/${DEBUG_SVD_FILE}
-		${CMAKE_SOURCE_DIR}/../svd/${DEBUG_SVD_FILE}
 	)
-
-	if(CONFIG_DEBUG_TCBINFO)
-		# jlink-nuttx.so
-		add_custom_command(
-			OUTPUT ${NUTTX_DIR}/tools/jlink-nuttx.so
-			COMMAND make --no-print-directory --silent -f Makefile.host jlink-nuttx
-			DEPENDS ${NUTTX_DIR}/tools/jlink-nuttx.c
-			WORKING_DIRECTORY ${NUTTX_DIR}/tools
-		)
-		add_custom_target(jlink-nuttx ALL
-			DEPENDS ${NUTTX_DIR}/tools/jlink-nuttx.so
-		)
-
-		# JLINK_RTOS_PATH used by launch.json.in
-		set(JLINK_RTOS_PATH ${NUTTX_DIR}/tools/jlink-nuttx.so)
-	else()
-		set(JLINK_RTOS_PATH "")
-	endif()
-
 	if(DEBUG_SVD_FILE_PATH)
 		message(STATUS "Found SVD: ${DEBUG_SVD_FILE_PATH}")
 	endif()

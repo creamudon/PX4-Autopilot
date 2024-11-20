@@ -54,8 +54,6 @@
 
 #include "mavlink_bridge_header.h"
 
-using namespace time_literals;
-
 /**
  * @class MavlinkULog
  * ULog streaming class. At most one instance (stream) can exist, assigned to a specific mavlink channel.
@@ -122,7 +120,7 @@ private:
 	static px4_sem_t _lock;
 	static bool _init;
 	static MavlinkULog *_instance;
-	static constexpr hrt_abstime _rate_calculation_delta_t = 100_ms; ///< rate update interval
+	static const float _rate_calculation_delta_t; ///< rate update interval
 
 	uORB::SubscriptionData<ulog_stream_s> _ulog_stream_sub{ORB_ID(ulog_stream)};
 	uORB::Publication<ulog_stream_ack_s> _ulog_stream_ack_pub{ORB_ID(ulog_stream_ack)};

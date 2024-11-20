@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ControlAllocationPseudoInverseTest.cpp
+ * @file ControlAllocationTest.cpp
  *
  * Tests for Control Allocation Algorithms
  *

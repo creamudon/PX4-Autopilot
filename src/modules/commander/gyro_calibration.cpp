@@ -219,7 +219,9 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 			/* maximum allowable calibration error */
 			static constexpr float maxoff = math::radians(0.6f);
 
-			if (!worker_data.offset[0].isAllFinite() ||
+			if (!PX4_ISFINITE(worker_data.offset[0](0)) ||
+			    !PX4_ISFINITE(worker_data.offset[0](1)) ||
+			    !PX4_ISFINITE(worker_data.offset[0](2)) ||
 			    fabsf(xdiff) > maxoff || fabsf(ydiff) > maxoff || fabsf(zdiff) > maxoff) {
 
 				calibration_log_critical(mavlink_log_pub, "motion, retrying..");
@@ -253,7 +255,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 		for (unsigned uorb_index = 0; uorb_index < MAX_GYROS; uorb_index++) {
 
-			calibration::Gyroscope &calibration = worker_data.calibrations[uorb_index];
+			auto &calibration = worker_data.calibrations[uorb_index];
 
 			if (calibration.device_id() != 0) {
 				calibration.set_offset(worker_data.offset[uorb_index]);

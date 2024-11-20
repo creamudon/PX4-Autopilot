@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file cdevtest_example.h
+ * @file vcdevtest_example.h
  * Example app for Linux
  *
  * @author Mark Charlebois <charlebm@gmail.com>

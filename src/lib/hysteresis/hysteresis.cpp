@@ -74,15 +74,17 @@ Hysteresis::update(const hrt_abstime &now_us)
 {
 	if (_requested_state != _state) {
 
+		const hrt_abstime elapsed = now_us - _last_time_to_change_state;
+
 		if (_state && !_requested_state) {
 			// true -> false
-			if (now_us >= _last_time_to_change_state + _time_from_true_us) {
+			if (elapsed >= _time_from_true_us) {
 				_state = false;
 			}
 
 		} else if (!_state && _requested_state) {
 			// false -> true
-			if (now_us >= _last_time_to_change_state + _time_from_false_us) {
+			if (elapsed >= _time_from_false_us) {
 				_state = true;
 			}
 		}

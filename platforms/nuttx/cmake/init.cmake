@@ -33,7 +33,7 @@
 
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 	if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS_EQUAL 7)
-		message(FATAL_ERROR "GCC 7 or older no longer supported. https://docs.px4.io/main/en/dev_setup/dev_env.html")
+		message(FATAL_ERROR "GCC 7 or older no longer supported. https://docs.px4.io/master/en/dev_setup/dev_env.html")
 	endif()
 endif()
 
@@ -76,10 +76,6 @@ execute_process(
 	WORKING_DIRECTORY ${NUTTX_DIR}
 	OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_olddefconfig.log
 	RESULT_VARIABLE ret
-)
-execute_process(
-	COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/defconfig_inflate_stamp
-	WORKING_DIRECTORY ${NUTTX_DIR}
 )
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_DIR}/.config ${PX4_BINARY_DIR}/NuttX/nuttx/.config)
 

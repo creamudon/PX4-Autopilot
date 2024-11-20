@@ -124,8 +124,6 @@ void RcInput::_measure(void)
 	_data.rc_failsafe = false;
 	_data.rc_lost = false;
 	_data.input_source = input_rc_s::RC_INPUT_SOURCE_PX4IO_PPM;
-	_data.link_quality = -1;
-	_data.rssi_dbm = NAN;
 
 	_rcinput_pub.publish(_data);
 }
@@ -211,3 +209,4 @@ int rpi_rc_in_main(int argc, char **argv)
 	return 1;
 
 }
+

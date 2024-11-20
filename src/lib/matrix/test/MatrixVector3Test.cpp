@@ -71,7 +71,13 @@ TEST(MatrixVector3Test, Vector3)
 
 	Vector3f h;
 	EXPECT_EQ(h, Vector3f(0, 0, 0));
-	Vector4f j(1.f, 2.f, 3.f, 4.f);
+
+	Vector<float, 4> j;
+	j(0) = 1;
+	j(1) = 2;
+	j(2) = 3;
+	j(3) = 4;
+
 	Vector3f k = j.slice<3, 1>(0, 0);
 	Vector3f k_test(1, 2, 3);
 	EXPECT_EQ(k, k_test);
@@ -80,13 +86,4 @@ TEST(MatrixVector3Test, Vector3)
 	Vector3f m2(3.1f, 4.1f, 5.1f);
 	EXPECT_EQ(m2, m1 + 2.1f);
 	EXPECT_EQ(m2 - 2.1f, m1);
-
-	// Test Addition and Subtraction of Slices
-	Vector3f v1(3, 13, 0);
-	Vector3f v2(42, 6, 256);
-
-	EXPECT_EQ(v1.xy() - v2.xy(), Vector2f(-39, 7));
-	EXPECT_EQ(v1.xy() + v2.xy(), Vector2f(45, 19));
-	EXPECT_EQ(v1.xy() + 2.f, Vector2f(5, 15));
-	EXPECT_EQ(v1.xy() - 2.f, Vector2f(1, 11));
 }

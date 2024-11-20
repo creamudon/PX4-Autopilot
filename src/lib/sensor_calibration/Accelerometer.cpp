@@ -111,7 +111,7 @@ void Accelerometer::SensorCorrectionsUpdate(bool force)
 bool Accelerometer::set_offset(const Vector3f &offset)
 {
 	if (Vector3f(_offset - offset).longerThan(0.01f)) {
-		if (offset.isAllFinite()) {
+		if (PX4_ISFINITE(offset(0)) && PX4_ISFINITE(offset(1)) && PX4_ISFINITE(offset(2))) {
 			_offset = offset;
 			_calibration_count++;
 			return true;
@@ -124,7 +124,9 @@ bool Accelerometer::set_offset(const Vector3f &offset)
 bool Accelerometer::set_scale(const Vector3f &scale)
 {
 	if (Vector3f(_scale - scale).longerThan(0.01f)) {
-		if (scale.isAllFinite() && (scale(0) > 0.f) && (scale(1) > 0.f) && (scale(2) > 0.f)) {
+		if ((scale(0) > 0.f) && (scale(1) > 0.f) && (scale(2) > 0.f) &&
+		    PX4_ISFINITE(scale(0)) && PX4_ISFINITE(scale(1)) && PX4_ISFINITE(scale(2))) {
+
 			_scale = scale;
 			_calibration_count++;
 			return true;

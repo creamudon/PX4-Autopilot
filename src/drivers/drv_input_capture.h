@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file drv_input_capture.h
+ * @file Input capture interface.
  *
  * Input capture interface utilizes the FMU_AUX_PINS to time stamp
  * an edge.

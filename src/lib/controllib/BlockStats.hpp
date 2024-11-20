@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file BlockStats.hpp
+ * @file blocks.h
  *
  * Controller library code
  */

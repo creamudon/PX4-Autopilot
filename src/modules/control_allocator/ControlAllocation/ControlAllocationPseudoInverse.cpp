@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ControlAllocationPseudoInverse.cpp
+ * @file ControlAllocationPseudoInverse.hpp
  *
  * Simple Control Allocation Algorithm
  *
@@ -59,7 +59,7 @@ ControlAllocationPseudoInverse::updatePseudoInverse()
 	if (_mix_update_needed) {
 		matrix::geninv(_effectiveness, _mix);
 
-		if (_normalization_needs_update && !_had_actuator_failure) {
+		if (_normalization_needs_update) {
 			updateControlAllocationMatrixScale();
 			_normalization_needs_update = false;
 		}

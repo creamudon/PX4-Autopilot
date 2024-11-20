@@ -52,25 +52,25 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/actuator_test.h>
+#include <uORB/topics/safety.h>
 #include <parameters/param.h>
 
 using namespace time_literals;
 
 bool check_battery_disconnected(orb_advert_t *mavlink_log_pub)
 {
-	uORB::SubscriptionData<battery_status_s> battery_status_sub{ORB_ID(battery_status)};
-	battery_status_sub.update();
+	uORB::SubscriptionData<battery_status_s> batt_sub{ORB_ID(battery_status)};
+	const battery_status_s &battery = batt_sub.get();
+	batt_sub.update();
 
-	const bool recent_battery_measurement = hrt_absolute_time() < (battery_status_sub.get().timestamp + 1_s);
-
-	if (!recent_battery_measurement) {
-		// We have to send this message for now because "battery unavailable" gets ignored by QGC
-		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Disconnect battery and try again");
+	if (battery.timestamp == 0) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "battery unavailable");
 		return false;
 	}
 
-	// Make sure battery is reported to be disconnected
-	if (recent_battery_measurement && !battery_status_sub.get().connected) {
+	// Make sure battery is disconnected
+	// battery is not connected if the connected flag is not set and we have a recent battery measurement
+	if (!battery.connected && (hrt_elapsed_time(&battery.timestamp) < 500_ms)) {
 		return true;
 	}
 
@@ -92,82 +92,194 @@ static void set_motor_actuators(uORB::Publication<actuator_test_s> &publisher, f
 	}
 }
 
-int do_esc_calibration(orb_advert_t *mavlink_log_pub)
+int do_esc_calibration_ctrl_alloc(orb_advert_t *mavlink_log_pub)
 {
-	// 1 Initialization
-	bool calibration_failed = false;
+	// check safety
+	uORB::SubscriptionData<safety_s> safety_sub{ORB_ID(safety)};
+	safety_sub.update();
 
+	if (safety_sub.get().safety_switch_available && !safety_sub.get().safety_off) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Disable safety first");
+		return PX4_ERROR;
+	}
+
+	int	return_code = PX4_OK;
 	uORB::Publication<actuator_test_s> actuator_test_pub{ORB_ID(actuator_test)};
 	// since we publish multiple at once, make sure the output driver subscribes before we publish
 	actuator_test_pub.advertise();
+	px4_usleep(10000);
 
-	uORB::SubscriptionData<battery_status_s> battery_status_sub{ORB_ID(battery_status)};
-	battery_status_sub.update();
-	const bool battery_connected_before_calibration = battery_status_sub.get().connected;
-	const float current_before_calibration = battery_status_sub.get().current_a;
-
-	calibration_log_info(mavlink_log_pub, CAL_QGC_STARTED_MSG, "esc");
-
-	px4_usleep(10_ms);
-
-	// 2 Set motors to high
+	// set motors to high
 	set_motor_actuators(actuator_test_pub, 1.f, false);
 	calibration_log_info(mavlink_log_pub, "[cal] Connect battery now");
 
+
+	uORB::SubscriptionData<battery_status_s> batt_sub{ORB_ID(battery_status)};
+	const battery_status_s &battery = batt_sub.get();
+	batt_sub.update();
+	bool batt_connected = battery.connected;
 	hrt_abstime timeout_start = hrt_absolute_time();
 
-	// 3 Wait for user to connect power
 	while (true) {
-		hrt_abstime now = hrt_absolute_time();
-		battery_status_sub.update();
+		// We are either waiting for the user to connect the battery. Or we are waiting to let the PWM
+		// sit high.
+		static constexpr hrt_abstime battery_connect_wait_timeout{20_s};
+		static constexpr hrt_abstime pwm_high_timeout{3_s};
+		hrt_abstime timeout_wait = batt_connected ? pwm_high_timeout : battery_connect_wait_timeout;
 
-		if (now > (timeout_start + 1_s) && (battery_status_sub.get().current_a > current_before_calibration + 1.f)) {
-			// Safety termination, current rises immediately, user didn't unplug power before
-			calibration_failed = true;
+		if (hrt_elapsed_time(&timeout_start) > timeout_wait) {
+			if (!batt_connected) {
+				calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Timeout waiting for battery");
+				return_code = PX4_ERROR;
+			}
+
+			// PWM was high long enough
 			break;
 		}
 
-		if (!battery_connected_before_calibration && battery_status_sub.get().connected) {
-			// Battery connection detected we can go to the next step immediately
-			break;
+		if (!batt_connected) {
+			if (batt_sub.update()) {
+				if (battery.connected) {
+					// Battery is connected, signal to user and start waiting again
+					batt_connected = true;
+					timeout_start = hrt_absolute_time();
+					calibration_log_info(mavlink_log_pub, "[cal] Battery connected");
+				}
+			}
 		}
 
-		if (now > (timeout_start + 6_s)) {
-			// Timeout, we continue since maybe the battery cannot be detected properly
-			// If we abort here and the ESCs are infact connected and started calibrating
-			// they will measure the disarmed value as the lower limit instead of the fixed 1000us
-			break;
-		}
-
-		px4_usleep(50_ms);
+		px4_usleep(50000);
 	}
 
-	// 4 Wait for ESCs to measure high signal
-	if (!calibration_failed) {
-		calibration_log_info(mavlink_log_pub, "[cal] Battery connected");
-		px4_usleep(3_s);
-	}
-
-	// 5 Set motors to low
-	if (!calibration_failed) {
+	if (return_code == PX4_OK) {
+		// set motors to low
 		set_motor_actuators(actuator_test_pub, 0.f, false);
+		px4_usleep(4000000);
+
+		// release control
+		set_motor_actuators(actuator_test_pub, 0.f, true);
+
+		calibration_log_info(mavlink_log_pub, CAL_QGC_DONE_MSG, "esc");
 	}
 
-	// 6 Wait for ESCs to measure low signal
-	if (!calibration_failed) {
-		px4_usleep(5_s);
+	return return_code;
+}
+
+static int do_esc_calibration_ioctl(orb_advert_t *mavlink_log_pub)
+{
+	int	return_code = PX4_OK;
+	hrt_abstime timeout_start = 0;
+
+	uORB::SubscriptionData<battery_status_s> batt_sub{ORB_ID(battery_status)};
+	const battery_status_s &battery = batt_sub.get();
+	batt_sub.update();
+	bool batt_connected = battery.connected;
+
+	int fd = px4_open(PWM_OUTPUT0_DEVICE_PATH, 0);
+
+	if (fd < 0) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Can't open PWM device");
+		return_code = PX4_ERROR;
+		goto Out;
 	}
 
-	// 7 release control
-	set_motor_actuators(actuator_test_pub, 0.f, true);
+	/* tell IO/FMU that its ok to disable its safety with the switch */
+	if (px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0) != PX4_OK) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Unable to disable safety switch");
+		return_code = PX4_ERROR;
+		goto Out;
+	}
 
-	// 8 Report
-	if (calibration_failed) {
-		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Timeout waiting for battery");
-		return PX4_ERROR;
+	/* tell IO/FMU that the system is armed (it will output values if safety is off) */
+	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) != PX4_OK) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Unable to arm system");
+		return_code = PX4_ERROR;
+		goto Out;
+	}
+
+	/* tell IO to switch off safety without using the safety switch */
+	if (px4_ioctl(fd, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0) != PX4_OK) {
+		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Unable to force safety off");
+		return_code = PX4_ERROR;
+		goto Out;
+	}
+
+	calibration_log_info(mavlink_log_pub, "[cal] Connect battery now");
+
+	timeout_start = hrt_absolute_time();
+
+	while (true) {
+		// We are either waiting for the user to connect the battery. Or we are waiting to let the PWM
+		// sit high.
+		static constexpr hrt_abstime battery_connect_wait_timeout{20_s};
+		static constexpr hrt_abstime pwm_high_timeout{3_s};
+		hrt_abstime timeout_wait = batt_connected ? pwm_high_timeout : battery_connect_wait_timeout;
+
+		if (hrt_elapsed_time(&timeout_start) > timeout_wait) {
+			if (!batt_connected) {
+				calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Timeout waiting for battery");
+				return_code = PX4_ERROR;
+				goto Out;
+			}
+
+			// PWM was high long enough
+			break;
+		}
+
+		if (!batt_connected) {
+			if (batt_sub.update()) {
+				if (battery.connected) {
+					// Battery is connected, signal to user and start waiting again
+					batt_connected = true;
+					timeout_start = hrt_absolute_time();
+					calibration_log_info(mavlink_log_pub, "[cal] Battery connected");
+				}
+			}
+		}
+
+		px4_usleep(50000);
+	}
+
+Out:
+
+	if (fd != -1) {
+		if (px4_ioctl(fd, PWM_SERVO_SET_FORCE_SAFETY_ON, 0) != PX4_OK) {
+			calibration_log_info(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Safety switch still off");
+		}
+
+		if (px4_ioctl(fd, PWM_SERVO_DISARM, 0) != PX4_OK) {
+			calibration_log_info(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Servos still armed");
+		}
+
+		if (px4_ioctl(fd, PWM_SERVO_CLEAR_ARM_OK, 0) != PX4_OK) {
+			calibration_log_info(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Safety switch still deactivated");
+		}
+
+		px4_close(fd);
+	}
+
+	if (return_code == PX4_OK) {
+		calibration_log_info(mavlink_log_pub, CAL_QGC_DONE_MSG, "esc");
+	}
+
+	return return_code;
+}
+
+int do_esc_calibration(orb_advert_t *mavlink_log_pub)
+{
+	calibration_log_info(mavlink_log_pub, CAL_QGC_STARTED_MSG, "esc");
+
+	param_t p_ctrl_alloc = param_find("SYS_CTRL_ALLOC");
+	int32_t ctrl_alloc = 0;
+
+	if (p_ctrl_alloc != PARAM_INVALID) {
+		param_get(p_ctrl_alloc, &ctrl_alloc);
+	}
+
+	if (ctrl_alloc == 1) {
+		return do_esc_calibration_ctrl_alloc(mavlink_log_pub);
 
 	} else {
-		calibration_log_info(mavlink_log_pub, CAL_QGC_DONE_MSG, "esc");
-		return PX4_OK;
+		return do_esc_calibration_ioctl(mavlink_log_pub);
 	}
 }

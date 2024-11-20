@@ -58,3 +58,4 @@ add_custom_command(OUTPUT ${generated_actuators_metadata_file}
 	COMMENT "Generating actuators.json"
 )
 add_custom_target(actuators_json DEPENDS ${generated_actuators_metadata_file})
+

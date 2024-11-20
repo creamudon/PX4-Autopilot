@@ -41,24 +41,17 @@
 
 #pragma once
 
-#include <cstdint>
-
 class Navigator;
 
 class NavigatorMode
 {
 public:
-	NavigatorMode(Navigator *navigator, uint8_t navigator_state_id);
+	NavigatorMode(Navigator *navigator);
 	virtual ~NavigatorMode() = default;
 	NavigatorMode(const NavigatorMode &) = delete;
-	NavigatorMode &operator=(const NavigatorMode &) = delete;
-	virtual void initialize() = 0;
+	NavigatorMode operator=(const NavigatorMode &) = delete;
 
 	void run(bool active);
-
-	bool isActive() {return _active;};
-
-	uint8_t getNavigatorStateId() const { return _navigator_state_id; }
 
 	/**
 	 * This function is called while the mode is inactive
@@ -80,12 +73,9 @@ public:
 	 */
 	virtual void on_active();
 
-	virtual void updateFailsafeChecks() {};
-
 protected:
 	Navigator *_navigator{nullptr};
 
 private:
 	bool _active{false};
-	uint8_t _navigator_state_id{0};
 };

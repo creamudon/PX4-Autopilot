@@ -46,7 +46,7 @@
  * and can be dangerous. Only activate if you know what you
  * are doing, and in a safe environment.
  *
- * Any motion of the remote stick will abort the signal
+ * Any motion of the remote stick will abord the signal
  * injection and reset this parameter
  * Best is to perform the identification in position or
  * hold mode.
@@ -103,72 +103,3 @@ PARAM_DEFINE_INT32(FW_AT_APPLY, 2);
  * @group Autotune
  */
 PARAM_DEFINE_INT32(FW_AT_AXES, 3);
-
-/**
- * Enable/disable auto tuning using an RC AUX input
- *
- * Defines which RC_MAP_AUXn parameter maps the RC channel used to enable/disable auto tuning.
- *
- * @value 0 Disable
- * @value 1 Aux1
- * @value 2 Aux2
- * @value 3 Aux3
- * @value 4 Aux4
- * @value 5 Aux5
- * @value 6 Aux6
- * @min 0
- * @max 6
- * @group Autotune
- */
-PARAM_DEFINE_INT32(FW_AT_MAN_AUX, 0);
-
-/**
- * Start frequency of the injected signal
- *
- * Can be set lower or higher than the end frequency
- *
- * @min 0.1
- * @max 30.0
- * @decimal 1
- * @unit Hz
- * @group Autotune
- */
-PARAM_DEFINE_FLOAT(FW_AT_SYSID_F0, 1.f);
-
-/**
- * End frequency of the injected signal
- *
- * Can be set lower or higher than the start frequency
- *
- * @min 0.1
- * @max 30.0
- * @decimal 1
- * @unit Hz
- * @group Autotune
- */
-PARAM_DEFINE_FLOAT(FW_AT_SYSID_F1, 20.f);
-
-/**
- * Maneuver time for each axis
- *
- * Duration of the input signal sent on each axis during system identification
- *
- * @min 5
- * @max 120
- * @decimal 0
- * @unit s
- * @group Autotune
- */
-PARAM_DEFINE_FLOAT(FW_AT_SYSID_TIME, 10.f);
-
-/**
- * Input signal type
- *
- * Type of signal used during system identification to excite the system.
- *
- * @value 0 Step
- * @value 1 Linear sine sweep
- * @value 2 Logarithmic sine sweep
- * @group Autotune
- */
-PARAM_DEFINE_INT32(FW_AT_SYSID_TYPE, 0);

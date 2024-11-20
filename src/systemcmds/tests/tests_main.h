@@ -61,6 +61,7 @@ extern int test_IntrusiveSortedList(int argc, char *argv[]);
 extern int test_List(int argc, char *argv[]);
 extern int test_mathlib(int argc, char *argv[]);
 extern int test_matrix(int argc, char *argv[]);
+extern int test_mixer(int argc, char *argv[]);
 extern int test_mount(int argc, char *argv[]);
 extern int test_param(int argc, char *argv[]);
 extern int test_parameters(int argc, char *argv[]);

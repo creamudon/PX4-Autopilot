@@ -46,10 +46,8 @@ OutputMavlinkV1::OutputMavlinkV1(const Parameters &parameters)
 	: OutputBase(parameters)
 {}
 
-void OutputMavlinkV1::update(const ControlData &control_data, bool new_setpoints, uint8_t &gimbal_device_id)
+void OutputMavlinkV1::update(const ControlData &control_data, bool new_setpoints)
 {
-	hrt_abstime now = hrt_absolute_time();
-
 	vehicle_command_s vehicle_command{};
 	vehicle_command.timestamp = hrt_absolute_time();
 	vehicle_command.target_system = (uint8_t)_parameters.mnt_mav_sysid_v1;
@@ -93,9 +91,10 @@ void OutputMavlinkV1::update(const ControlData &control_data, bool new_setpoints
 
 	_handle_position_update(control_data);
 
-	_calculate_angle_output(now);
+	hrt_abstime t = hrt_absolute_time();
+	_calculate_angle_output(t);
 
-	vehicle_command.timestamp = now;
+	vehicle_command.timestamp = t;
 	vehicle_command.command = vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONTROL;
 
 	// gimbal spec has roll, pitch on channels 0, 1, respectively; MAVLink spec has roll, pitch on channels 1, 0, respectively
@@ -109,7 +108,7 @@ void OutputMavlinkV1::update(const ControlData &control_data, bool new_setpoints
 
 	_stream_device_attitude_status();
 
-	_last_update = now;
+	_last_update = t;
 }
 
 void OutputMavlinkV1::_stream_device_attitude_status()
@@ -143,15 +142,16 @@ OutputMavlinkV2::OutputMavlinkV2(const Parameters &parameters)
 {
 }
 
-void OutputMavlinkV2::update(const ControlData &control_data, bool new_setpoints, uint8_t &gimbal_device_id)
+void OutputMavlinkV2::update(const ControlData &control_data, bool new_setpoints)
 {
-	hrt_abstime now = hrt_absolute_time();
-
 	_check_for_gimbal_device_information();
 
-	if (!_gimbal_device_found && now - _last_gimbal_device_checked > 1000000) {
+	hrt_abstime t = hrt_absolute_time();
+
+
+	if (!_gimbal_device_found && t - _last_gimbal_device_checked > 1000000) {
 		_request_gimbal_device_information();
-		_last_gimbal_device_checked = now;
+		_last_gimbal_device_checked = t;
 
 	} else {
 		if (new_setpoints) {
@@ -159,10 +159,8 @@ void OutputMavlinkV2::update(const ControlData &control_data, bool new_setpoints
 			_set_angle_setpoints(control_data);
 
 			_handle_position_update(control_data);
-			_last_update = now;
+			_last_update = t;
 		}
-
-		gimbal_device_id = _gimbal_device_found ? _gimbal_device_compid : 0;
 
 		_publish_gimbal_device_set_attitude();
 	}
@@ -208,13 +206,6 @@ void OutputMavlinkV2::print_status() const
 		     (double)_angle_velocity[0],
 		     (double)_angle_velocity[1],
 		     (double)_angle_velocity[2]);
-
-	if (_gimbal_device_found) {
-		PX4_INFO_RAW("  gimbal device compid found: %d\n", _gimbal_device_compid);
-
-	} else {
-		PX4_INFO_RAW("  gimbal device compid not found\n");
-	}
 }
 
 void OutputMavlinkV2::_publish_gimbal_device_set_attitude()

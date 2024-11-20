@@ -37,7 +37,7 @@
  ****************************************************************************/
 
 /**
- * @file pid.cpp
+ * @file pid.c
  *
  * Implementation of generic PID controller.
  *

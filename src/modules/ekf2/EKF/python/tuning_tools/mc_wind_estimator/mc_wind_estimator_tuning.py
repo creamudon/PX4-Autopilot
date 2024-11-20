@@ -45,20 +45,14 @@ import numpy as np
 import quaternion
 from scipy import optimize
 
-def getAllData(logfile, use_gnss):
+def getAllData(logfile):
     log = ULog(logfile)
 
-    if use_gnss:
-        v_local = np.array([getData(log, 'vehicle_gps_position', 'vel_n_m_s'),
-                  getData(log, 'vehicle_gps_position', 'vel_e_m_s'),
-                  getData(log, 'vehicle_gps_position', 'vel_d_m_s')])
-        t_v_local = ms2s(getData(log, 'vehicle_gps_position', 'timestamp'))
+    v_local = np.matrix([getData(log, 'vehicle_local_position', 'vx'),
+              getData(log, 'vehicle_local_position', 'vy'),
+              getData(log, 'vehicle_local_position', 'vz')])
 
-    else:
-        v_local = np.array([getData(log, 'vehicle_local_position', 'vx'),
-                  getData(log, 'vehicle_local_position', 'vy'),
-                  getData(log, 'vehicle_local_position', 'vz')])
-        t_v_local = ms2s(getData(log, 'vehicle_local_position', 'timestamp'))
+    t_v_local = ms2s(getData(log, 'vehicle_local_position', 'timestamp'))
 
     accel = np.matrix([getData(log, 'sensor_combined', 'accelerometer_m_s2[0]'),
               getData(log, 'sensor_combined', 'accelerometer_m_s2[1]'),
@@ -132,19 +126,17 @@ def getData(log, topic_name, variable_name, instance=0):
 def ms2s(time_ms):
     return time_ms * 1e-6
 
-def run(logfile, use_gnss):
-    (t, v_body, a_body) = getAllData(logfile, use_gnss)
+def run(logfile):
+    (t, v_body, a_body) = getAllData(logfile)
 
     rho = 1.15 # air densitiy
     rho15 = 1.225 # air density at 15 degC
 
-    rel_wind_speed = np.sqrt(v_body[0]**2 + v_body[1]**2 + v_body[2]**2)
-
     # x[0]: momentum drag, scales with v
     # x[1]: inverse of ballistic coefficient (X body axis), scales with v^2
     # x[2]: inverse of ballistic coefficient (Y body axis), scales with v^2
-    predict_acc_x = lambda x: -v_body[0] * x[0] - 0.5 * rho * v_body[0] * rel_wind_speed * x[1]
-    predict_acc_y = lambda x: -v_body[1] * x[0] - 0.5 * rho * v_body[1] * rel_wind_speed * x[2]
+    predict_acc_x = lambda x: -v_body[0] * x[0] - 0.5 * rho * v_body[0]**2 * np.sign(v_body[0]) * x[1]
+    predict_acc_y = lambda x: -v_body[1] * x[0] - 0.5 * rho * v_body[1]**2 * np.sign(v_body[1]) * x[2]
 
     J = lambda x: np.sum(np.power(abs(a_body[0]-predict_acc_x(x)), 2.0) + np.power(abs(a_body[1]-predict_acc_y(x)), 2.0)) # cost function
 
@@ -203,10 +195,8 @@ if __name__ == '__main__':
 
     # Provide parameter file path and name
     parser.add_argument('logfile', help='Full ulog file path, name and extension', type=str)
-    parser.add_argument('--gnss', help='Use GNSS velocity instead of local velocity estimate',
-                        action='store_true')
     args = parser.parse_args()
 
     logfile = os.path.abspath(args.logfile) # Convert to absolute path
 
-    run(logfile, args.gnss)
+    run(logfile)

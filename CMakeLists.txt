@@ -1,6 +1,6 @@
 ############################################################################
 #
-# Copyright (c) 2017 - 2024 PX4 Development Team. All rights reserved.
+# Copyright (c) 2017 - 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -99,7 +99,7 @@
 #
 #=============================================================================
 
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
 set(PX4_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE FILEPATH "PX4 source directory" FORCE)
 set(PX4_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}" CACHE FILEPATH "PX4 binary directory" FORCE)
@@ -113,36 +113,12 @@ include(px4_parse_function_args)
 include(px4_git)
 
 execute_process(
-	COMMAND git describe --exclude ext/* --tags --match "v[0-9]*"
+	COMMAND git describe --exclude ext/* --always --tags
 	OUTPUT_VARIABLE PX4_GIT_TAG
 	OUTPUT_STRIP_TRAILING_WHITESPACE
-	RESULTS_VARIABLE GIT_DESCRIBE_RESULT
 	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
 	)
-
-# if proper git tag unavilable default to v0.0.0
-if(NOT ${GIT_DESCRIBE_RESULT} MATCHES "0")
-	set(PX4_GIT_TAG "v0.0.0")
-endif()
-
-message(STATUS "PX4_GIT_TAG: ${PX4_GIT_TAG}")
-
-# git describe to X.Y.Z version
-string(REPLACE "." ";" VERSION_LIST ${PX4_GIT_TAG})
-
-# major version
-list(GET VERSION_LIST 0 PX4_VERSION_MAJOR)
-string(REPLACE "v" "" PX4_VERSION_MAJOR ${PX4_VERSION_MAJOR})
-# minor version
-list(GET VERSION_LIST 1 PX4_VERSION_MINOR)
-# patch version
-list(GET VERSION_LIST 2 PX4_VERSION_PATCH)
-string(REPLACE "-" ";" PX4_VERSION_PATCH ${PX4_VERSION_PATCH})
-list(GET PX4_VERSION_PATCH 0 PX4_VERSION_PATCH)
-
-# # Capture only the hash part after 'g'
-string(REGEX MATCH "g([a-f0-9]+)$" GIT_HASH "${PX4_GIT_TAG}")
-set(PX4_GIT_HASH ${CMAKE_MATCH_1})
+message(STATUS "PX4 version: ${PX4_GIT_TAG}")
 
 define_property(GLOBAL PROPERTY PX4_MODULE_LIBRARIES
                  BRIEF_DOCS "PX4 module libs"
@@ -158,7 +134,6 @@ define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
                  BRIEF_DOCS "PX4 module paths"
                  FULL_DOCS "List of paths to all PX4 modules"
                  )
-
 define_property(GLOBAL PROPERTY PX4_SRC_FILES
                  BRIEF_DOCS "src files from all PX4 modules & libs"
                  FULL_DOCS "SRC files from px4_add_{module,library}"
@@ -168,17 +143,25 @@ define_property(GLOBAL PROPERTY PX4_SRC_FILES
 # configuration
 #
 
+set(CONFIG "px4_sitl_default" CACHE STRING "desired configuration")
+
 include(px4_add_module)
 set(config_module_list)
 set(config_kernel_list)
 
 # Find Python
-find_package(PythonInterp 3)
-# We have a custom error message to tell users how to install python3.
-if(NOT PYTHONINTERP_FOUND)
-	message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
-		"    Ubuntu: sudo apt install python3 python3-dev python3-pip\n"
-		"    macOS: brew install python")
+# If using catkin, Python 2 is found since it points
+# to the Python libs installed with the ROS distro
+if (NOT CATKIN_DEVEL_PREFIX)
+	find_package(PythonInterp 3)
+	# We have a custom error message to tell users how to install python3.
+	if (NOT PYTHONINTERP_FOUND)
+		message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
+			"    Ubuntu: sudo apt install python3 python3-dev python3-pip\n"
+			"    macOS: brew install python")
+	endif()
+else()
+	find_package(PythonInterp REQUIRED)
 endif()
 
 option(PYTHON_COVERAGE "Python code coverage" OFF)
@@ -192,12 +175,6 @@ include(kconfig)
 message(STATUS "PX4 config: ${PX4_CONFIG}")
 message(STATUS "PX4 platform: ${PX4_PLATFORM}")
 
-if($ENV{CLION_IDE})
-	# CLion automatically executes some compiler commands after configuring the
-	# project. This would fail on NuttX, as visibility.h tries to (indirectly)
-	# include nuttx/config.h, which at that point does not exist yet
-	add_definitions(-DPX4_DISABLE_GCC_POISON)
-endif()
 
 if(${PX4_PLATFORM} STREQUAL "posix")
 	if(ENABLE_LOCKSTEP_SCHEDULER)
@@ -223,11 +200,6 @@ list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake)
 if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
 	include(init)
 endif()
-
-#=============================================================================
-# project definition
-#
-project(px4 CXX C ASM)
 
 # CMake build type (Debug Release RelWithDebInfo MinSizeRel Coverage)
 if(NOT CMAKE_BUILD_TYPE)
@@ -257,13 +229,10 @@ endif()
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release;RelWithDebInfo;MinSizeRel;Coverage;AddressSanitizer;UndefinedBehaviorSanitizer")
 message(STATUS "cmake build type: ${CMAKE_BUILD_TYPE}")
 
-# Check if LTO option and check if toolchain supports it
-if(LTO)
-    include(CheckIPOSupported)
-    check_ipo_supported()
-    message(AUTHOR_WARNING "LTO enabled: LTO is highly experimental and should not be used in production")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
+#=============================================================================
+# project definition
+#
+project(px4 CXX C ASM)
 
 set(package-contact "px4users@googlegroups.com")
 
@@ -273,9 +242,15 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PX4_BINARY_DIR})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PX4_BINARY_DIR})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PX4_BINARY_DIR})
+# For the catkin build process, unset build of dynamically-linked binaries
+# and do not change CMAKE_RUNTIME_OUTPUT_DIRECTORY
+if (NOT CATKIN_DEVEL_PREFIX)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PX4_BINARY_DIR})
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PX4_BINARY_DIR})
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PX4_BINARY_DIR})
+else()
+	SET(BUILD_SHARED_LIBS OFF)
+endif()
 
 #=============================================================================
 
@@ -307,10 +282,7 @@ if(${PX4_PLATFORM} STREQUAL "posix")
 	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 	set(CMAKE_ENABLE_EXPORTS ON)
 
-	if(CMAKE_BUILD_TYPE MATCHES "Coverage")
-		include(coverage)
-	endif()
-
+	include(coverage)
 	include(sanitizers)
 
 	# Define GNU standard installation directories
@@ -322,6 +294,21 @@ if(${PX4_PLATFORM} STREQUAL "posix")
 endif()
 
 include(ccache)
+
+#=============================================================================
+# find programs and packages
+#
+
+# see if catkin was invoked to build this
+if (CATKIN_DEVEL_PREFIX)
+	message(STATUS "catkin ENABLED")
+	find_package(catkin REQUIRED)
+	if (catkin_FOUND)
+		catkin_package()
+	else()
+		message(FATAL_ERROR "catkin not found")
+	endif()
+endif()
 
 #=============================================================================
 # get chip and chip manufacturer
@@ -408,18 +395,12 @@ include(px4_add_gtest)
 if(BUILD_TESTING)
 	include(gtest)
 
-	# Ensure there's no -R without any filter expression since that trips newer ctest versions
-	if(TESTFILTER)
-		set(TESTFILTERARG "-R")
-	else()
-		set(TESTFILTERARG "")
-	endif()
-
 	add_custom_target(test_results
-			COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test ${TESTFILTERARG} ${TESTFILTER}
+			COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test -R ${TESTFILTER} USES_TERMINAL
 			DEPENDS
 				px4
 				examples__dyn_hello
+				test_mixer_multirotor
 			USES_TERMINAL
 			COMMENT "Running tests"
 			WORKING_DIRECTORY ${PX4_BINARY_DIR})
@@ -432,8 +413,6 @@ endif()
 #
 add_library(parameters_interface INTERFACE)
 add_library(kernel_parameters_interface INTERFACE)
-add_library(events_interface INTERFACE)
-add_library(kernel_events_interface INTERFACE)
 
 include(px4_add_library)
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
@@ -458,13 +437,10 @@ add_subdirectory(src/lib/metadata EXCLUDE_FROM_ALL)
 add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
 
 if(${PX4_PLATFORM} STREQUAL "nuttx" AND NOT CONFIG_BUILD_FLAT)
-	target_link_libraries(parameters_interface INTERFACE usr_parameters)
-	target_link_libraries(kernel_parameters_interface INTERFACE parameters)
-	target_link_libraries(events_interface INTERFACE usr_events)
-	target_link_libraries(kernel_events_interface INTERFACE events)
+target_link_libraries(parameters_interface INTERFACE usr_parameters)
+target_link_libraries(kernel_parameters_interface INTERFACE parameters)
 else()
-	target_link_libraries(parameters_interface INTERFACE parameters)
-	target_link_libraries(events_interface INTERFACE events)
+target_link_libraries(parameters_interface INTERFACE parameters)
 endif()
 
 # firmware added last to generate the builtin for included modules
@@ -493,20 +469,21 @@ add_custom_command(OUTPUT ${uorb_graph_config}
 add_custom_target(uorb_graph DEPENDS ${uorb_graph_config})
 
 
-include(bloaty)
-
-
 include(doxygen)
 include(metadata)
 include(package)
 
+# print size
+add_custom_target(size
+	COMMAND size $<TARGET_FILE:px4>
+	DEPENDS px4
+	WORKING_DIRECTORY ${PX4_BINARY_DIR}
+	USES_TERMINAL
+	)
+
 # install python requirements using configured python
 add_custom_target(install_python_requirements
-	COMMAND ${PYTHON_EXECUTABLE} -m pip install --break-system-packages --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
+	COMMAND ${PYTHON_EXECUTABLE} -m pip install --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	USES_TERMINAL
 )
-
-if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/finalize.cmake")
-	include(finalize)
-endif()

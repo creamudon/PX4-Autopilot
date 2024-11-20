@@ -47,16 +47,16 @@
  * Return mode return altitude
  *
  * Default minimum altitude above destination (e.g. home, safe point, landing pattern) for return flight.
- * The vehicle will climb to this altitude when Return mode is enganged, unless it currently is flying higher already.
  * This is affected by RTL_MIN_DIST and RTL_CONE_ANG.
  *
  * @unit m
  * @min 0
+ * @max 150
  * @decimal 1
  * @increment 0.5
  * @group Return Mode
  */
-PARAM_DEFINE_FLOAT(RTL_RETURN_ALT, 60.f);
+PARAM_DEFINE_FLOAT(RTL_RETURN_ALT, 60);
 
 
 /**
@@ -64,15 +64,15 @@ PARAM_DEFINE_FLOAT(RTL_RETURN_ALT, 60.f);
  *
  * Descend to this altitude (above destination position) after return, and wait for time defined in RTL_LAND_DELAY.
  * Land (i.e. slowly descend) from this altitude if autolanding allowed.
- * VTOLs do transition to hover in this altitdue above the landing point.
  *
  * @unit m
- * @min 0
+ * @min 2
+ * @max 100
  * @decimal 1
  * @increment 0.5
  * @group Return Mode
  */
-PARAM_DEFINE_FLOAT(RTL_DESCEND_ALT, 30.f);
+PARAM_DEFINE_FLOAT(RTL_DESCEND_ALT, 30);
 
 /**
  * Return mode delay
@@ -82,6 +82,7 @@ PARAM_DEFINE_FLOAT(RTL_DESCEND_ALT, 30.f);
  *
  * @unit s
  * @min -1
+ * @max 300
  * @decimal 1
  * @increment 0.5
  * @group Return Mode
@@ -97,6 +98,7 @@ PARAM_DEFINE_FLOAT(RTL_LAND_DELAY, 0.0f);
  *
  * @unit m
  * @min 0.5
+ * @max 100
  * @decimal 1
  * @increment 0.5
  * @group Return Mode
@@ -154,6 +156,7 @@ PARAM_DEFINE_INT32(RTL_PLD_MD, 0);
  *
  * @unit m
  * @min 25
+ * @max 1000
  * @decimal 1
  * @increment 0.5
  * @group Return Mode
@@ -161,9 +164,21 @@ PARAM_DEFINE_INT32(RTL_PLD_MD, 0);
 PARAM_DEFINE_FLOAT(RTL_LOITER_RAD, 80.0f);
 
 /**
+ * RTL heading mode
+ *
+ * Defines the heading behavior during RTL
+ *
+ * @value 0 Towards next waypoint.
+ * @value 1 Heading matches destination.
+ * @value 2 Use current heading.
+ * @group Return Mode
+ */
+PARAM_DEFINE_INT32(RTL_HDG_MD, 0);
+
+/**
  * RTL time estimate safety margin factor
  *
- * Safety factor that is used to scale the actual RTL time estimate.
+ * Safety factor that is used to scale the actual RTL time estiamte.
  * Time with margin = RTL_TIME_FACTOR * time + RTL_TIME_MARGIN
  *
  * @min 1.0
@@ -188,13 +203,3 @@ PARAM_DEFINE_FLOAT(RTL_TIME_FACTOR, 1.1f);
  * @group Return To Land
  */
 PARAM_DEFINE_INT32(RTL_TIME_MARGIN, 100);
-
-/**
- * RTL force approach landing
- *
- * Only consider RTL point, if it has an approach defined.
- *
- * @boolean
- * @group Return To Land
- */
-PARAM_DEFINE_INT32(RTL_APPR_FORCE, 0);

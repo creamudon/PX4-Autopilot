@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 /**
- * @file fake_geofence.hpp
+ * @file fake_geofence.h
  * Provides a fake geofence interface to use for testing
  *
  * @author Roman Bapst

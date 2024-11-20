@@ -353,3 +353,4 @@ int lm_mag_fit(const float x[], const float y[], const float z[], unsigned int s
 
 	return 1;
 }
+

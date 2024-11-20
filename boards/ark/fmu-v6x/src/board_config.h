@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016-2024 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016, 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 /**
  * @file board_config.h
  *
- * ARKFMU-v6x internal definitions
+ * PX4FMU-v6x internal definitions
  */
 
 #pragma once
@@ -125,7 +125,7 @@
 /* SPI */
 
 #define SPI6_nRESET_EXTERNAL1       /* PF10 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTF|GPIO_PIN10)
-#define SPI6_RESET(on_true)          px4_arch_gpiowrite(SPI6_nRESET_EXTERNAL1, !(on_true))
+#define GPIO_SYNC                   /* PE9  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_100MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN9)
 
 /* I2C busses */
 
@@ -133,7 +133,7 @@
  *
  * Note that these are unshifted addresses.
  */
-#define PX4_I2C_OBDEV_SE050         0x48
+#define GPIO_I2C2_DRDY1_BMP388      /* PG5  */  (GPIO_INPUT|GPIO_FLOAT|GPIO_EXTI|GPIO_PORTG|GPIO_PIN5)
 
 /*
  * ADC channels
@@ -204,19 +204,33 @@
 #define BOARD_ADC_OPEN_CIRCUIT_V     (5.6f)
 
 /* HW Version and Revision drive signals Default to 1 to detect */
-#define BOARD_HAS_HW_SPLIT_VERSIONING
+#define BOARD_HAS_HW_VERSIONING
 
 #define GPIO_HW_VER_REV_DRIVE  /* PG0 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN0)
 #define GPIO_HW_REV_SENSE      /* PH4 */  GPIO_ADC3_INP15
 #define GPIO_HW_VER_SENSE      /* PH3 */  GPIO_ADC3_INP14
-#define HW_INFO_INIT_PREFIX    "ARKV6X"
+#define HW_INFO_INIT           {'V','6','X','x', 'x',0}
+#define HW_INFO_INIT_VER       3 /* Offset in above string of the VER */
+#define HW_INFO_INIT_REV       4 /* Offset in above string of the REV */
 
-#define BOARD_NUM_SPI_CFG_HW_VERSIONS 2
+#define BOARD_NUM_SPI_CFG_HW_VERSIONS 2 // Rev 0 and Rev 3 Sensor sets
 //                 Base/FMUM
-#define ARKV6X_0   HW_FMUM_ID(0x0) // ARKV6X,     Sensor Set  Rev 0
-#define ARKV6X_1   HW_FMUM_ID(0x1) // ARKV6X,     Sensor Set  Rev 1
+#define V6X00   HW_VER_REV(0x0,0x0) // FMUV6X,                 Rev 0
+#define V6X01   HW_VER_REV(0x0,0x1) // FMUV6X,     BMI388 I2C2 Rev 1
+#define V6X03   HW_VER_REV(0x0,0x3) // FMUV6X,     Sensor Set  Rev 3
+#define V6X04   HW_VER_REV(0x0,0x4) // FMUV6X,     Sensor Set  Rev 4
+#define V6X10   HW_VER_REV(0x1,0x0) // NO PX4IO,               Rev 0
+#define V6X13   HW_VER_REV(0x1,0x3) // NO PX4IO,   Sensor Set  Rev 3
+#define V6X14   HW_VER_REV(0x1,0x4) // NO PX4IO,   Sensor Set  Rev 4
+#define V6X40   HW_VER_REV(0x4,0x0) // FMUV6X,                    HB CM4 base Rev 0
+#define V6X41   HW_VER_REV(0x4,0x1) // FMUV6X,     BMI388 I2C2    HB CM4 base Rev 1
+#define V6X43   HW_VER_REV(0x4,0x3) // FMUV6X,     Sensor Set     HB CM4 base Rev 3
+#define V6X44   HW_VER_REV(0x4,0x4) // FMUV6X,     Sensor Set     HB CM4 base Rev 4
+#define V6X50   HW_VER_REV(0x5,0x0) // FMUV6X,                    HB Mini Rev 0
+#define V6X51   HW_VER_REV(0x5,0x1) // FMUV6X,     BMI388 I2C2    HB Mini Rev 1
+#define V6X53   HW_VER_REV(0x5,0x3) // FMUV6X,     Sensor Set     HB Mini Rev 3
+#define V6X54   HW_VER_REV(0x5,0x4) // FMUV6X,     Sensor Set     HB Mini Rev 4
 
-#define UAVCAN_NUM_IFACES_RUNTIME  1
 
 /* HEATER
  * PWM in future
@@ -238,19 +252,8 @@
 
 /* PWM
  */
-#define DIRECT_PWM_OUTPUT_CHANNELS   8
+#define DIRECT_PWM_OUTPUT_CHANNELS   9
 
-#define GPIO_FMU_CH1                    /* PI0  */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTI|GPIO_PIN0)
-#define GPIO_FMU_CH2                    /* PH12 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTH|GPIO_PIN12)
-#define GPIO_FMU_CH3                    /* PH11 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTH|GPIO_PIN11)
-#define GPIO_FMU_CH4                    /* PH10 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTH|GPIO_PIN10)
-#define GPIO_FMU_CH5                    /* PD13 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTD|GPIO_PIN13)
-#define GPIO_FMU_CH6                    /* PD14 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTD|GPIO_PIN14)
-#define GPIO_FMU_CH7                    /* PH6  */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTH|GPIO_PIN6)
-#define GPIO_FMU_CH8                    /* PH9  */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTH|GPIO_PIN9)
-
-#define GPIO_FMU_CAP                    /* PE11 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTE|GPIO_PIN11)
-#define GPIO_SPIX_SYNC                  /* PE9  */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTE|GPIO_PIN9)
 
 /* Power supply control and monitoring GPIOs */
 
@@ -296,6 +299,7 @@
 #define VDD_3V3_SD_CARD_EN(on_true)        px4_arch_gpiowrite(GPIO_VDD_3V3_SD_CARD_EN, (on_true))
 #define VDD_3V3_ETH_POWER_EN(on_true)      px4_arch_gpiowrite(GPIO_ETH_POWER_EN, (on_true))
 
+
 /* Tone alarm output */
 
 #define TONE_ALARM_TIMER        14  /* Timer 14 */
@@ -322,6 +326,7 @@
 /* RC Serial port */
 
 #define RC_SERIAL_PORT                     "/dev/ttyS5"
+#define RC_SERIAL_SINGLEWIRE
 
 /* Input Capture Channels. */
 #define INPUT_CAP1_TIMER                  1
@@ -353,7 +358,7 @@
 #define SPEKTRUM_POWER(_on_true)           VDD_3V3_SPEKTRUM_POWER_EN(_on_true)
 
 /*
- * ARKV6X has a separate RC_IN
+ * FMUv6X has a separate RC_IN
  *
  * GPIO PPM_IN on PI5 T8CH1
  * SPEKTRUM_RX (it's TX or RX in Bind) on UART6 PC7
@@ -371,11 +376,11 @@
 /* SD card bringup does not work if performed on the IDLE thread because it
  * will cause waiting.  Use either:
  *
- *  CONFIG_BOARDCTL=y, OR
+ *  CONFIG_LIB_BOARDCTL=y, OR
  *  CONFIG_BOARD_INITIALIZE=y && CONFIG_BOARD_INITTHREAD=y
  */
 
-#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_BOARDCTL) && \
+#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_LIB_BOARDCTL) && \
    !defined(CONFIG_BOARD_INITTHREAD)
 #  warning SDIO initialization cannot be perfomed on the IDLE thread
 #endif
@@ -387,7 +392,7 @@
 #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
 #define BOARD_ADC_USB_VALID     (!px4_arch_gpioread(GPIO_nVDD_USB_VALID))
 
-/* ARKV6X never powers off the Servo rail */
+/* FMUv6X never powers off the Servo rail */
 
 #define BOARD_ADC_SERVO_VALID     (1)
 
@@ -455,6 +460,7 @@
 		GPIO_VDD_3V3_SPEKTRUM_POWER_EN,   \
 		GPIO_VDD_3V3_SD_CARD_EN,          \
 		GPIO_PD15,                        \
+		GPIO_SYNC,                        \
 		SPI6_nRESET_EXTERNAL1,            \
 		GPIO_ETH_POWER_EN,                \
 		GPIO_NFC_GPIO,                    \
@@ -462,17 +468,7 @@
 		GPIO_nSAFETY_SWITCH_LED_OUT_INIT, \
 		GPIO_SAFETY_SWITCH_IN,            \
 		GPIO_PG6,                         \
-		GPIO_nARMED_INIT,                 \
-		GPIO_FMU_CH1,     	          \
-		GPIO_FMU_CH2,     	          \
-		GPIO_FMU_CH3,     	          \
-		GPIO_FMU_CH4,     	          \
-		GPIO_FMU_CH5,     	          \
-		GPIO_FMU_CH6,     	          \
-		GPIO_FMU_CH7,     	          \
-		GPIO_FMU_CH8,     	          \
-		GPIO_FMU_CAP,     	          \
-		GPIO_SPIX_SYNC                    \
+		GPIO_nARMED_INIT                  \
 	}
 
 #define BOARD_ENABLE_CONSOLE_BUFFER
@@ -480,8 +476,7 @@
 #define PX4_I2C_BUS_MTD      4,5
 
 
-#define BOARD_NUM_IO_TIMERS  3
-#define BOARD_SPIX_SYNC_FREQ 32000
+#define BOARD_NUM_IO_TIMERS 5
 
 __BEGIN_DECLS
 

@@ -49,14 +49,10 @@ FlightTaskOrbit::FlightTaskOrbit()
 	_sticks_data_required = false;
 }
 
-bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, bool &success)
+bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command)
 {
-	if (command.command != vehicle_command_s::VEHICLE_CMD_DO_ORBIT) {
-		return false;
-	}
-
-	success = true;
-	// save previous velocity and rotation direction
+	bool ret = true;
+	// save previous velocity and roatation direction
 	bool new_is_clockwise = _orbit_velocity > 0;
 	float new_radius = _orbit_radius;
 	float new_absolute_velocity = fabsf(_orbit_velocity);
@@ -76,7 +72,7 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, b
 
 	float new_velocity = signFromBool(new_is_clockwise) * new_absolute_velocity;
 
-	if (math::isInRange(new_radius, _radius_min, _param_mc_orbit_rad_max.get())) {
+	if (math::isInRange(new_radius, _radius_min, _radius_max)) {
 		_started_clockwise = new_is_clockwise;
 		_sanitizeParams(new_radius, new_velocity);
 		_orbit_radius = new_radius;
@@ -85,19 +81,12 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, b
 	} else {
 		mavlink_log_critical(&_mavlink_log_pub, "Orbit radius limit exceeded\t");
 		events::send(events::ID("orbit_radius_exceeded"), events::Log::Alert, "Orbit radius limit exceeded");
-		success = false;
+		ret = false;
 	}
 
 	// commanded heading behaviour
 	if (PX4_ISFINITE(command.param3)) {
-		if (static_cast<uint8_t>(command.param3 + .5f) == vehicle_command_s::ORBIT_YAW_BEHAVIOUR_UNCHANGED) {
-			if (!_currently_orbiting) {	// only change the yaw behaviour if we are not actively orbiting
-				_yaw_behaviour = _param_mc_orbit_yaw_mod.get();
-			}
-
-		} else {
-			_yaw_behaviour = command.param3;
-		}
+		_yaw_behaviour = command.param3;
 	}
 
 	// save current yaw estimate for ORBIT_YAW_BEHAVIOUR_HOLD_INITIAL_HEADING
@@ -109,7 +98,7 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, b
 			_center.xy() = _geo_projection.project(command.param5, command.param6);
 
 		} else {
-			success = false;
+			ret = false;
 		}
 	}
 
@@ -119,7 +108,7 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, b
 			_center(2) = _global_local_alt0 - command.param7;
 
 		} else {
-			success = false;
+			ret = false;
 		}
 	}
 
@@ -129,7 +118,7 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command, b
 		_position_smoothing.reset(_acceleration_setpoint, _velocity_setpoint, _position);
 	}
 
-	return true;
+	return ret;
 }
 
 bool FlightTaskOrbit::sendTelemetry()
@@ -140,11 +129,9 @@ bool FlightTaskOrbit::sendTelemetry()
 	orbit_status.yaw_behaviour = _yaw_behaviour;
 
 	if (_geo_projection.isInitialized()) {
-		// While chainging altitude by stick _position_setpoint(2) is not set (NAN)
-		float local_altitude = PX4_ISFINITE(_position_setpoint(2)) ? _position_setpoint(2) : _position(2);
 		// local -> global
 		_geo_projection.reproject(_center(0), _center(1), orbit_status.x, orbit_status.y);
-		orbit_status.z = _global_local_alt0 - local_altitude;
+		orbit_status.z = _global_local_alt0 - _position_setpoint(2);
 
 	} else {
 		return false; // don't send the message if the transformation failed
@@ -159,7 +146,7 @@ bool FlightTaskOrbit::sendTelemetry()
 void FlightTaskOrbit::_sanitizeParams(float &radius, float &velocity) const
 {
 	// clip the radius to be within range
-	radius = math::constrain(radius, _radius_min, _param_mc_orbit_rad_max.get());
+	radius = math::constrain(radius, _radius_min, _radius_max);
 	velocity = math::constrain(velocity, -fabsf(_velocity_max), fabsf(_velocity_max));
 
 	bool exceeds_maximum_acceleration = (velocity * velocity) >= _acceleration_max * radius;
@@ -171,23 +158,26 @@ void FlightTaskOrbit::_sanitizeParams(float &radius, float &velocity) const
 	}
 }
 
-bool FlightTaskOrbit::activate(const trajectory_setpoint_s &last_setpoint)
+bool FlightTaskOrbit::activate(const vehicle_local_position_setpoint_s &last_setpoint)
 {
 	bool ret = FlightTaskManualAltitude::activate(last_setpoint);
-	_currently_orbiting = false;
 	_orbit_radius = _radius_min;
 	_orbit_velocity = 1.f;
 	_center = _position;
 	_initial_heading = _yaw;
 	_slew_rate_yaw.setForcedValue(_yaw);
 	_slew_rate_yaw.setSlewRate(math::radians(_param_mpc_yawrauto_max.get()));
-	_slew_rate_velocity.setSlewRate(_param_mpc_acc_hor.get());
 
 	// need a valid position and velocity
-	ret = ret && _position.isAllFinite() && _velocity.isAllFinite();
+	ret = ret && PX4_ISFINITE(_position(0))
+	      && PX4_ISFINITE(_position(1))
+	      && PX4_ISFINITE(_position(2))
+	      && PX4_ISFINITE(_velocity(0))
+	      && PX4_ISFINITE(_velocity(1))
+	      && PX4_ISFINITE(_velocity(2));
 
-	Vector3f pos_prev{last_setpoint.position};
-	Vector3f vel_prev{last_setpoint.velocity};
+	Vector3f vel_prev{last_setpoint.vx, last_setpoint.vy, last_setpoint.vz};
+	Vector3f pos_prev{last_setpoint.x, last_setpoint.y, last_setpoint.z};
 	Vector3f accel_prev{last_setpoint.acceleration};
 
 	for (int i = 0; i < 3; i++) {
@@ -210,14 +200,12 @@ bool FlightTaskOrbit::activate(const trajectory_setpoint_s &last_setpoint)
 bool FlightTaskOrbit::update()
 {
 	bool ret = true;
-	_currently_orbiting = true;
 	_updateTrajectoryBoundaries();
 	_adjustParametersByStick();
 
 	if (_is_position_on_circle()) {
 		if (_in_circle_approach) {
 			_in_circle_approach = false;
-			_slew_rate_velocity.setForcedValue(0.f); // reset the slew rate when moving between orbits.
 			FlightTaskManualAltitudeSmoothVel::_smoothing.reset(
 				PX4_ISFINITE(_acceleration_setpoint(2)) ? _acceleration_setpoint(2) : 0.f,
 				PX4_ISFINITE(_velocity_setpoint(2)) ? _velocity_setpoint(2) : _velocity(2),
@@ -258,7 +246,8 @@ void FlightTaskOrbit::_updateTrajectoryBoundaries()
 	// Update the constraints of the trajectories
 	_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
 	_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
-	_position_smoothing.setMaxJerk(_param_mpc_jerk_auto.get()); // TODO : Should be computed using heading
+	float max_jerk = _param_mpc_jerk_auto.get();
+	_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
 
 	if (_velocity_setpoint(2) < 0.f) { // up
 		_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_up.get());
@@ -331,20 +320,15 @@ void FlightTaskOrbit::_generate_circle_setpoints()
 	Vector3f center_to_position = _position - _center;
 	// xy velocity to go around in a circle
 	Vector2f velocity_xy(-center_to_position(1), center_to_position(0));
-
-	// slew rate is used to reduce the jerk when starting an orbit.
-	_slew_rate_velocity.update(_orbit_velocity, _deltatime);
-
 	velocity_xy = velocity_xy.unit_or_zero();
-	velocity_xy *= _slew_rate_velocity.getState();
+	velocity_xy *= _orbit_velocity;
 
 	// xy velocity adjustment to stay on the radius distance
 	velocity_xy += (_orbit_radius - center_to_position.xy().norm()) * Vector2f(center_to_position).unit_or_zero();
 
 	_position_setpoint(0) = _position_setpoint(1) = NAN;
 	_velocity_setpoint.xy() = velocity_xy;
-	_acceleration_setpoint.xy() = -Vector2f(center_to_position.unit_or_zero()) * _slew_rate_velocity.getState() *
-				      _slew_rate_velocity.getState() /
+	_acceleration_setpoint.xy() = -Vector2f(center_to_position.unit_or_zero()) * _orbit_velocity * _orbit_velocity /
 				      _orbit_radius;
 }
 

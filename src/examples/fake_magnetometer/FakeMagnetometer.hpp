@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file FakeMagnetometer.hpp
+ * @file FakeMagnetometer.cpp
  *
  * Publish the earth magnetic field as a fake magnetometer (sensor_mag).
  * Requires vehicle_attitude and vehicle_gps_position
@@ -50,7 +50,7 @@
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/sensor_gps.h>
+#include <uORB/topics/vehicle_gps_position.h>
 
 class FakeMagnetometer : public ModuleBase<FakeMagnetometer>, public ModuleParams, public px4::ScheduledWorkItem
 {

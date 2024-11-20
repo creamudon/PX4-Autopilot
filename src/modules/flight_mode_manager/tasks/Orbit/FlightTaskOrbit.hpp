@@ -47,7 +47,6 @@
 #include <lib/slew_rate/SlewRateYaw.hpp>
 #include <lib/motion_planning/PositionSmoothing.hpp>
 #include <lib/motion_planning/VelocitySmoothing.hpp>
-#include <lib/slew_rate/SlewRate.hpp>
 
 
 class FlightTaskOrbit : public FlightTaskManualAltitudeSmoothVel
@@ -57,8 +56,8 @@ public:
 	FlightTaskOrbit();
 	virtual ~FlightTaskOrbit() = default;
 
-	bool applyCommandParameters(const vehicle_command_s &command, bool &success) override;
-	bool activate(const trajectory_setpoint_s &last_setpoint) override;
+	bool applyCommandParameters(const vehicle_command_s &command) override;
+	bool activate(const vehicle_local_position_setpoint_s &last_setpoint) override;
 	bool update() override;
 
 protected:
@@ -71,6 +70,7 @@ protected:
 private:
 	/* TODO: Should be controlled by params */
 	static constexpr float _radius_min = 1.f;
+	static constexpr float _radius_max = 1e3f;
 	static constexpr float _velocity_max = 10.f;
 	static constexpr float _acceleration_max = 2.f;
 	static constexpr float _horizontal_acceptance_radius = 2.f;
@@ -125,17 +125,13 @@ private:
 	/** yaw behaviour during the orbit flight according to MAVLink's ORBIT_YAW_BEHAVIOUR enum */
 	int _yaw_behaviour = orbit_status_s::ORBIT_YAW_BEHAVIOUR_HOLD_FRONT_TO_CIRCLE_CENTER;
 	bool _started_clockwise{true};
-	bool _currently_orbiting{false};
 	float _initial_heading = 0.f; /**< the heading of the drone when the orbit command was issued */
 	SlewRateYaw<float> _slew_rate_yaw;
-	SlewRate<float> _slew_rate_velocity;
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 	uORB::PublicationMulti<orbit_status_s> _orbit_status_pub{ORB_ID(orbit_status)};
 
 	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::MC_ORBIT_RAD_MAX>) _param_mc_orbit_rad_max,
-		(ParamInt<px4::params::MC_ORBIT_YAW_MOD>) _param_mc_orbit_yaw_mod,
 		(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_mpc_xy_cruise, /**< cruise speed for circle approach */
 		(ParamFloat<px4::params::MPC_YAWRAUTO_MAX>) _param_mpc_yawrauto_max,
 		(ParamFloat<px4::params::MPC_XY_TRAJ_P>) _param_mpc_xy_traj_p,

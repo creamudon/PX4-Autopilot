@@ -50,14 +50,7 @@ struct watchdog_data_t {
 	int logger_main_task_index = -1;
 	int logger_writer_task_index = -1;
 	hrt_abstime ready_to_run_timestamp = hrt_absolute_time();
-	hrt_abstime sem_counter_saturated_start = hrt_absolute_time();
 	uint8_t last_state = TSTATE_TASK_INVALID;
-	int log_writer_priority = 0;
-	int logger_main_priority = 0;
-	hrt_abstime trigger_time = 0; ///< timestamp when it was triggered
-	bool manual_watchdog_trigger = false;
-	bool triggered_by_cycle_delay = false;
-	bool triggered_by_ready_delay = false;
 #endif /* __PX4_NUTTX */
 };
 
@@ -77,10 +70,9 @@ void watchdog_initialize(const pid_t pid_logger_main, const pthread_t writer_thr
  * Expected to be called from IRQ context.
  *
  * @param watchdog_data
- * @param semaphore_value_saturated if the scheduling semaphore counter is saturated
  * @return true if watchdog is triggered, false otherwise
  */
-bool watchdog_update(watchdog_data_t &watchdog_data, bool semaphore_value_saturated);
+bool watchdog_update(watchdog_data_t &watchdog_data);
 
 } //namespace logger
 } //namespace px4

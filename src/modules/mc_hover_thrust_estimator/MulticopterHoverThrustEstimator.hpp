@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file MulticopterHoverThrustEstimator.hpp
+ * @file hover_thrust_estimator.hpp
  * @brief Interface class for a hover thrust estimator
  * Convention is positive thrust, hover thrust and acceleration UP
  *

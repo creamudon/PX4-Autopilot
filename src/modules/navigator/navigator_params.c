@@ -43,7 +43,7 @@
 /**
  * Loiter radius (FW only)
  *
- * Default value of loiter radius in FW mode (e.g. for Loiter mode).
+ * Default value of loiter radius for missions, Hold mode, Return mode, etc. (fixedwing only).
  *
  * @unit m
  * @min 25
@@ -58,7 +58,7 @@ PARAM_DEFINE_FLOAT(NAV_LOITER_RAD, 80.0f);
  * Acceptance Radius
  *
  * Default acceptance radius, overridden by acceptance radius of waypoint if set.
- * For fixed wing the npfg switch distance is used for horizontal acceptance.
+ * For fixed wing the L1 turning distance is used for horizontal acceptance.
  *
  * @unit m
  * @min 0.05
@@ -128,20 +128,23 @@ PARAM_DEFINE_FLOAT(NAV_MC_ALT_RAD, 0.8f);
 PARAM_DEFINE_INT32(NAV_TRAFF_AVOID, 1);
 
 /**
- * Set NAV TRAFFIC AVOID horizontal distance
+ * Set NAV TRAFFIC AVOID RADIUS MANNED
  *
- * Defines a crosstrack horizontal distance
+ * Defines the Radius where NAV TRAFFIC AVOID is Called
+ * For Manned Aviation
  *
  * @unit m
  * @min 500
  *
  * @group Mission
  */
-PARAM_DEFINE_FLOAT(NAV_TRAFF_A_HOR, 500);
+PARAM_DEFINE_FLOAT(NAV_TRAFF_A_RADM, 500);
 
 /**
- * Set NAV TRAFFIC AVOID vertical distance
+ * Set NAV TRAFFIC AVOID RADIUS
  *
+ * Defines the Radius where NAV TRAFFIC AVOID is Called
+ * For Unmanned Aviation
  *
  * @unit m
  * @min 10
@@ -149,20 +152,44 @@ PARAM_DEFINE_FLOAT(NAV_TRAFF_A_HOR, 500);
  *
  * @group Mission
  */
-PARAM_DEFINE_FLOAT(NAV_TRAFF_A_VER, 500);
+PARAM_DEFINE_FLOAT(NAV_TRAFF_A_RADU, 10);
 
 /**
- * Estimated time until collision
+ * Airfield home Lat
  *
- * Minimum acceptable time until collsion.
- * Assumes constant speed over 3d distance.
+ * Latitude of airfield home waypoint
  *
- * @unit s
- * @min 1
+ * @unit deg*1e7
+ * @min -900000000
  * @max 900000000
- * @group Mission
+ * @group Data Link Loss
  */
-PARAM_DEFINE_INT32(NAV_TRAFF_COLL_T, 60);
+PARAM_DEFINE_INT32(NAV_AH_LAT, -265847810);
+
+/**
+ * Airfield home Lon
+ *
+ * Longitude of airfield home waypoint
+ *
+ * @unit deg*1e7
+ * @min -1800000000
+ * @max 1800000000
+ * @group Data Link Loss
+ */
+PARAM_DEFINE_INT32(NAV_AH_LON, 1518423250);
+
+/**
+ * Airfield home alt
+ *
+ * Altitude of airfield home waypoint
+ *
+ * @unit m
+ * @min -50
+ * @decimal 1
+ * @increment 0.5
+ * @group Data Link Loss
+ */
+PARAM_DEFINE_FLOAT(NAV_AH_ALT, 600.0f);
 
 /**
  * Force VTOL mode takeoff and land
@@ -171,37 +198,3 @@ PARAM_DEFINE_INT32(NAV_TRAFF_COLL_T, 60);
  * @group Mission
  */
 PARAM_DEFINE_INT32(NAV_FORCE_VT, 1);
-
-/**
- * Minimum Loiter altitude
- *
- * This is the minimum altitude above Home the system will always obey in Loiter (Hold) mode if switched into this
- * mode without specifying an altitude (e.g. through Loiter switch on RC).
- * Doesn't affect Loiters that are part of Missions or that are entered through a reposition setpoint ("Go to").
- * Set to a negative value to disable.
- *
- * @unit m
- * @min -1
- * @decimal 1
- * @increment 0.5
- * @group Mission
- */
-PARAM_DEFINE_FLOAT(NAV_MIN_LTR_ALT, -1.f);
-
-/**
- * Minimum height above ground during Mission and RTL
- *
- * Minimum height above ground the vehicle is allowed to descend to during Mission and RTL,
- * excluding landing commands.
- * Requires a distance sensor to be set up.
- * Note: only prevents the vehicle from descending further, but does not force it to climb.
- *
- * Set to a negative value to disable.
- *
- * @unit m
- * @min -1
- * @decimal 1
- * @increment 1
- * @group Mission
- */
-PARAM_DEFINE_FLOAT(NAV_MIN_GND_DIST, -1.f);

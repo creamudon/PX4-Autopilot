@@ -39,7 +39,7 @@
  */
 
 /**
- * Normalized tilt in Hover
+ * Position of tilt servo in mc mode
  *
  * @min 0.0
  * @max 1.0
@@ -50,7 +50,7 @@
 PARAM_DEFINE_FLOAT(VT_TILT_MC, 0.0f);
 
 /**
- * Normalized tilt in transition to FW
+ * Position of tilt servo in transition mode
  *
  * @min 0.0
  * @max 1.0
@@ -58,10 +58,10 @@ PARAM_DEFINE_FLOAT(VT_TILT_MC, 0.0f);
  * @decimal 3
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_TILT_TRANS, 0.4f);
+PARAM_DEFINE_FLOAT(VT_TILT_TRANS, 0.3f);
 
 /**
- * Normalized tilt in FW
+ * Position of tilt servo in fw mode
  *
  * @min 0.0
  * @max 1.0
@@ -72,9 +72,24 @@ PARAM_DEFINE_FLOAT(VT_TILT_TRANS, 0.4f);
 PARAM_DEFINE_FLOAT(VT_TILT_FW, 1.0f);
 
 /**
+ * Tilt actuator control value commanded when disarmed and during the first second after arming.
+ *
+ * This specific tilt during spin-up is necessary for some systems whose motors otherwise don't
+ * spin-up freely.
+ *
+ * @min 0.0
+ * @max 1.0
+ * @increment 0.01
+ * @decimal 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_TILT_SPINUP, 0.0f);
+
+/**
  * Duration of front transition phase 2
  *
- * Time in seconds it takes to tilt form VT_TILT_TRANS to VT_TILT_FW.
+ * Time in seconds it should take for the rotors to rotate forward completely from the point
+ * when the plane has picked up enough airspeed and is ready to go into fixed wind mode.
  *
  * @unit s
  * @min 0.1
@@ -84,17 +99,3 @@ PARAM_DEFINE_FLOAT(VT_TILT_FW, 1.0f);
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_TRANS_P2_DUR, 0.5f);
-
-/**
- * Duration motor tilt up in backtransition
- *
- * Time in seconds it takes to tilt form VT_TILT_FW to VT_TILT_MC.
- *
- * @unit s
- * @min 0.1
- * @max 10
- * @increment 0.1
- * @decimal 1
- * @group VTOL Attitude Control
- */
-PARAM_DEFINE_FLOAT(VT_BT_TILT_DUR, 1.f);

@@ -63,16 +63,8 @@ int RM3100::self_test()
 {
 	bool complete = false;
 
-	// Set the default command mode and enable polling (not continuous mode)
-	uint8_t cmd = (CMM_DEFAULT & ~CONTINUOUS_MODE);
+	uint8_t cmd = (CMM_DEFAULT | POLLING_MODE);
 	int ret = _interface->write(ADDR_CMM, &cmd, 1);
-
-	if (ret != PX4_OK) {
-		return ret;
-	}
-
-	cmd = HSHAKE_NO_DRDY_CLEAR;
-	ret = _interface->write(ADDR_HSHAKE, &cmd, 1);
 
 	if (ret != PX4_OK) {
 		return ret;
@@ -86,19 +78,26 @@ int RM3100::self_test()
 		return ret;
 	}
 
-	// Poll to start the self test
-	cmd = POLL_XYZ;
-	ret = _interface->write(ADDR_POLL, &cmd, 1);
-
-	if (ret != PX4_OK) {
-		return ret;
-	}
-
-	// Perform test procedure until a valid result is obtained or test times out
-
+	/* Perform test procedure until a valid result is obtained or test times out */
 	const hrt_abstime t_start = hrt_absolute_time();
 
 	while ((hrt_absolute_time() - t_start) < BIST_DUR_USEC) {
+
+		// Re-disable DRDY clear
+		cmd = HSHAKE_NO_DRDY_CLEAR;
+		ret = _interface->write(ADDR_HSHAKE, &cmd, 1);
+
+		if (ret != PX4_OK) {
+			return ret;
+		}
+
+		// Poll for a measurement
+		cmd = POLL_XYZ;
+		ret = _interface->write(ADDR_POLL, &cmd, 1);
+
+		if (ret != PX4_OK) {
+			return ret;
+		}
 
 		uint8_t status = 0;
 		ret = _interface->read(ADDR_STATUS, &status, 1);
@@ -120,16 +119,8 @@ int RM3100::self_test()
 			if (cmd & BIST_STE) {
 				complete = true;
 
-				// If the x, y, or z LR oscillators malfunctioned then the self test failed.
-				if ((cmd & BIST_XYZ_OK) ^ BIST_XYZ_OK) {
-					PX4_ERR("built-in self test failed: 0x%2X x:%s y:%s z:%s", cmd,
-						cmd & 0x10 ? "Pass" : "Fail",
-						cmd & 0x20 ? "Pass" : "Fail",
-						cmd & 0x40 ? "Pass" : "Fail");
-					return PX4_ERROR;
-
-				} else {
-					// The test passed, disable self-test mode by clearing the STE bit
+				// If the test passed, disable self-test mode by clearing the STE bit
+				if (cmd & BIST_XYZ_OK) {
 					cmd = 0;
 					ret = _interface->write(ADDR_BIST, &cmd, 1);
 
@@ -138,6 +129,9 @@ int RM3100::self_test()
 					}
 
 					return PX4_OK;
+
+				} else {
+					PX4_ERR("built-in self test failed");
 				}
 			}
 		}
@@ -266,9 +260,6 @@ int RM3100::set_default_register_values()
 	cmd[0] = CCZ_DEFAULT_MSB;
 	cmd[1] = CCZ_DEFAULT_LSB;
 	_interface->write(ADDR_CCZ, cmd, 2);
-
-	cmd[0] = HSHAKE_DEFAULT;
-	_interface->write(ADDR_HSHAKE, cmd, 1);
 
 	cmd[0] = CMM_DEFAULT;
 	_interface->write(ADDR_CMM, cmd, 1);

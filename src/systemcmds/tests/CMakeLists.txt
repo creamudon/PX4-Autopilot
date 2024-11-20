@@ -36,7 +36,7 @@ set(srcs
 	test_bezierQuad.cpp
 	test_bitset.cpp
 	test_bson.cpp
-	test_dataman.cpp
+	test_dataman.c
 	test_file.c
 	test_file2.c
 	test_float.cpp
@@ -50,6 +50,7 @@ set(srcs
 	test_IntrusiveSortedList.cpp
 	test_mathlib.cpp
 	test_matrix.cpp
+	test_mixer.cpp
 	test_param.c
 	test_parameters.cpp
 	test_perf.c
@@ -93,7 +94,6 @@ px4_add_module(
 	SRCS
 		${srcs}
 	DEPENDS
-		dataman_client
 		version
 	)
 

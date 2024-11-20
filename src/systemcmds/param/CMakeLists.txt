@@ -35,7 +35,6 @@ px4_add_module(
 	MAIN param
 	COMPILE_FLAGS
 		-Wno-array-bounds
-	STACK_MAIN 4096
 	SRCS
 		param.cpp
 	DEPENDS

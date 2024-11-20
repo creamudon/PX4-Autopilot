@@ -45,7 +45,6 @@
 #pragma once
 
 #include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/gps_inject_data.h>
@@ -55,7 +54,6 @@
 #include <uavcan/equipment/gnss/Fix.hpp>
 #include <uavcan/equipment/gnss/Fix2.hpp>
 #include <ardupilot/gnss/MovingBaselineData.hpp>
-#include <ardupilot/gnss/RelPosHeading.hpp>
 #include <uavcan/equipment/gnss/RTCMStream.hpp>
 
 #include <lib/perf/perf_counter.h>
@@ -83,7 +81,6 @@ private:
 	void gnss_auxiliary_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::Auxiliary> &msg);
 	void gnss_fix_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::Fix> &msg);
 	void gnss_fix2_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::Fix2> &msg);
-	void gnss_relative_sub_cb(const uavcan::ReceivedDataStructure<ardupilot::gnss::RelPosHeading> &msg);
 
 	template <typename FixType>
 	void process_fixx(const uavcan::ReceivedDataStructure<FixType> &msg,
@@ -91,9 +88,7 @@ private:
 			  const float (&pos_cov)[9], const float (&vel_cov)[9],
 			  const bool valid_pos_cov, const bool valid_vel_cov,
 			  const float heading, const float heading_offset,
-			  const float heading_accuracy, const int32_t noise_per_ms,
-			  const int32_t jamming_indicator, const uint8_t jamming_state,
-			  const uint8_t spoofing_state);
+			  const float heading_accuracy);
 
 	void handleInjectDataTopic();
 	bool PublishRTCMStream(const uint8_t *data, size_t data_len);
@@ -115,16 +110,11 @@ private:
 		void (UavcanGnssBridge::*)(const uavcan::TimerEvent &)>
 		TimerCbBinder;
 
-	typedef uavcan::MethodBinder < UavcanGnssBridge *,
-		void (UavcanGnssBridge::*)(const uavcan::ReceivedDataStructure<ardupilot::gnss::RelPosHeading> &) >
-		RelPosHeadingCbBinder;
-
 	uavcan::INode &_node;
 
 	uavcan::Subscriber<uavcan::equipment::gnss::Auxiliary, AuxiliaryCbBinder> _sub_auxiliary;
 	uavcan::Subscriber<uavcan::equipment::gnss::Fix, FixCbBinder> _sub_fix;
 	uavcan::Subscriber<uavcan::equipment::gnss::Fix2, Fix2CbBinder> _sub_fix2;
-	uavcan::Subscriber<ardupilot::gnss::RelPosHeading, RelPosHeadingCbBinder> _sub_gnss_heading;
 
 	uavcan::Publisher<ardupilot::gnss::MovingBaselineData> _pub_moving_baseline_data;
 	uavcan::Publisher<uavcan::equipment::gnss::RTCMStream> _pub_rtcm_stream;
@@ -133,9 +123,7 @@ private:
 	float		_last_gnss_auxiliary_hdop{0.0f};
 	float		_last_gnss_auxiliary_vdop{0.0f};
 
-	uORB::SubscriptionMultiArray<gps_inject_data_s, gps_inject_data_s::MAX_INSTANCES> _orb_inject_data_sub{ORB_ID::gps_inject_data};
-	hrt_abstime		_last_rtcm_injection_time{0};	///< time of last rtcm injection
-	uint8_t			_selected_rtcm_instance{0};	///< uorb instance that is being used for RTCM corrections
+	uORB::Subscription _gps_inject_data_sub{ORB_ID(gps_inject_data)};
 
 	bool _system_clock_set{false};  ///< Have we set the system clock at least once from GNSS data?
 
@@ -143,10 +131,6 @@ private:
 
 	bool _publish_rtcm_stream{false};
 	bool _publish_moving_baseline_data{false};
-
-	float _rel_heading_accuracy{NAN};
-	float _rel_heading{NAN};
-	bool _rel_heading_valid{false};
 
 	perf_counter_t _rtcm_stream_pub_perf{nullptr};
 	perf_counter_t _moving_baseline_data_pub_perf{nullptr};

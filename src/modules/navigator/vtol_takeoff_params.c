@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file vtol_takeoff_params.c
+ * @file VTOLTakeoff_params.c
  *
  * Parameters for the VTOL takeoff navigation mode.
  *

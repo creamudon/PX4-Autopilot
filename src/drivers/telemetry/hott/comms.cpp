@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file comms.cpp
+ * @file comms.c
  * @author Simon Wilks <sjwilks@gmail.com>
  *
  */

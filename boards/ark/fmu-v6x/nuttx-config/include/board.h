@@ -1,7 +1,7 @@
 /************************************************************************************
  * nuttx-configs/px4_fmu-v6x/include/board.h
  *
- *   Copyright (C) 2016-2022 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2016-2019 Gregory Nutt. All rights reserved.
  *   Authors: David Sidrane <david.sidrane@nscdg.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -248,7 +248,7 @@
 
 /* ADC 1 2 3 clock source */
 
-#define STM32_RCC_D3CCIPR_ADCSRC     RCC_D3CCIPR_ADCSEL_PLL2
+#define STM32_RCC_D3CCIPR_ADCSEL     RCC_D3CCIPR_ADCSEL_PLL2
 
 /* FDCAN 1 2 clock source */
 
@@ -302,7 +302,7 @@
 #define STM32_SDMMC_CLKCR_EDGE      STM32_SDMMC_CLKCR_NEGEDGE
 
 /* LED definitions ******************************************************************/
-/* The ARKV6X board has three, LED_GREEN a Green LED, LED_BLUE a Blue LED and
+/* The PX4 FMUV6X board has three, LED_GREEN a Green LED, LED_BLUE a Blue LED and
  * LED_RED a Red LED, that can be controlled by software.
  *
  * If CONFIG_ARCH_LEDS is not defined, then the user can control the LEDs in any way.
@@ -379,8 +379,8 @@
 
 #define GPIO_UART5_RX    GPIO_UART5_RX_3    /* PD2  */
 #define GPIO_UART5_TX    GPIO_UART5_TX_3    /* PC12 */
-// GPIO_UART5_RTS  No remap                 /* PC8  */
-#define GPIO_UART5_CTS   (GPIO_ALT|GPIO_AF8|GPIO_PORTC|GPIO_PIN9|GPIO_PULLDOWN)    /* PC9  */
+// GPIO_UART5_RTS   no remap                /* PC8  */
+// GPIO_UART5_CTS  No remap                 /* PC9  */
 
 #define GPIO_USART6_RX   GPIO_USART6_RX_1   /* PC7 */
 #define GPIO_USART6_TX   GPIO_USART6_TX_1   /* PC6  */
@@ -388,7 +388,7 @@
 #define GPIO_UART7_RX    GPIO_UART7_RX_4    /* PF6  */
 #define GPIO_UART7_TX    GPIO_UART7_TX_3    /* PE8  */
 #define GPIO_UART7_RTS   GPIO_UART7_RTS_2   /* PF8  */
-#define GPIO_UART7_CTS   (GPIO_UART7_CTS_1 | GPIO_PULLDOWN)   /* PE10 */
+#define GPIO_UART7_CTS   GPIO_UART7_CTS_1   /* PE10 */
 
 #define GPIO_UART8_RX    GPIO_UART8_RX_1    /* PE0 */
 #define GPIO_UART8_TX    GPIO_UART8_TX_1    /* PE1 */

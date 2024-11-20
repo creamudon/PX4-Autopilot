@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2024 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +44,6 @@
  * - MAVLink gimbal protocol v2
  */
 
-#include <cstdint>
 #include <stdlib.h>
 #include <string.h>
 #include <px4_platform_common/defines.h>
@@ -78,7 +77,6 @@ struct ThreadData {
 	int last_input_active = -1;
 	OutputBase *output_obj = nullptr;
 	InputTest *test_input = nullptr;
-	ControlData control_data {};
 };
 static ThreadData *g_thread_data = nullptr;
 
@@ -104,6 +102,7 @@ static int gimbal_thread_main(int argc, char *argv[])
 
 	uORB::SubscriptionInterval parameter_update_sub{ORB_ID(parameter_update), 1_s};
 	thread_running.store(true);
+	ControlData control_data {};
 	g_thread_data = &thread_data;
 
 	thread_data.test_input = new InputTest(params);
@@ -207,6 +206,12 @@ static int gimbal_thread_main(int argc, char *argv[])
 			update_params(param_handles, params);
 		}
 
+		if (thread_data.last_input_active == -1) {
+			// Reset control as no one is active anymore, or yet.
+			control_data.sysid_primary_control = 0;
+			control_data.compid_primary_control = 0;
+		}
+
 		InputBase::UpdateResult update_result = InputBase::UpdateResult::NoUpdate;
 
 		if (thread_data.input_objs_len > 0) {
@@ -221,7 +226,7 @@ static int gimbal_thread_main(int argc, char *argv[])
 				const unsigned int poll_timeout =
 					(already_active || thread_data.last_input_active == -1) ? 20 : 0;
 
-				update_result = thread_data.input_objs[i]->update(poll_timeout, thread_data.control_data, already_active);
+				update_result = thread_data.input_objs[i]->update(poll_timeout, control_data, already_active);
 
 				bool break_loop = false;
 
@@ -245,7 +250,11 @@ static int gimbal_thread_main(int argc, char *argv[])
 					break;
 
 				case InputBase::UpdateResult::UpdatedNotActive:
-					// Ignore, input not active
+					if (already_active) {
+						// No longer active
+						thread_data.last_input_active = -1;
+					}
+
 					break;
 				}
 
@@ -264,15 +273,10 @@ static int gimbal_thread_main(int argc, char *argv[])
 				thread_data.output_obj->set_stabilize(false, false, false);
 			}
 
-			if (thread_data.output_obj->check_and_handle_setpoint_timeout(thread_data.control_data, hrt_absolute_time())) {
-				// Without flagging an update the changes are not processed in the output
-				update_result = InputBase::UpdateResult::UpdatedActive;
-			}
-
 			// Update output
 			thread_data.output_obj->update(
-				thread_data.control_data,
-				update_result != InputBase::UpdateResult::NoUpdate, thread_data.control_data.device_compid);
+				control_data,
+				update_result != InputBase::UpdateResult::NoUpdate);
 
 			// Only publish the mount orientation if the mode is not mavlink v1 or v2
 			// If the gimbal speaks mavlink it publishes its own orientation.
@@ -369,104 +373,27 @@ int gimbal_main(int argc, char *argv[])
 		if (thread_running.load() && g_thread_data && g_thread_data->test_input) {
 
 			if (argc >= 4) {
-
-				float roll_deg = 0.0f;
-				float pitch_deg = 0.0f;
-				float yaw_deg = 0.0f;
-				float rollrate_deg_s = 0.0f;
-				float pitchrate_deg_s = 0.0f;
-				float yawrate_deg_s = 0.0f;
-
-				bool angles_set = false;
-				bool rates_set = false;
+				bool found_axis = false;
+				const char *axis_names[3] = {"roll", "pitch", "yaw"};
+				int angles[3] = { 0, 0, 0 };
 
 				for (int arg_i = 2 ; arg_i < (argc - 1); ++arg_i) {
-
-					if (!strcmp(argv[arg_i], "roll")) {
-						roll_deg = (int)strtof(argv[arg_i + 1], nullptr);
-						angles_set = true;
-
-					} else if (!strcmp(argv[arg_i], "pitch")) {
-						pitch_deg = (int)strtof(argv[arg_i + 1], nullptr);
-						angles_set = true;
-
-					} else if (!strcmp(argv[arg_i], "yaw")) {
-						yaw_deg = (int)strtof(argv[arg_i + 1], nullptr);
-						angles_set = true;
-
-					} else if (!strcmp(argv[arg_i], "rollrate")) {
-						rollrate_deg_s = (int)strtof(argv[arg_i + 1], nullptr);
-						rates_set = true;
-
-					} else if (!strcmp(argv[arg_i], "pitchrate")) {
-						pitchrate_deg_s = (int)strtof(argv[arg_i + 1], nullptr);
-						rates_set = true;
-
-					} else if (!strcmp(argv[arg_i], "yawrate")) {
-						yawrate_deg_s = (int)strtof(argv[arg_i + 1], nullptr);
-						rates_set = true;
-
-					} else {
-						PX4_ERR("Unknown argument: %s", argv[arg_i]);
-						usage();
-						return -1;
+					for (int axis_i = 0; axis_i < 3; ++axis_i) {
+						if (!strcmp(argv[arg_i], axis_names[axis_i])) {
+							int angle_deg = (int)strtol(argv[arg_i + 1], nullptr, 0);
+							angles[axis_i] = angle_deg;
+							found_axis = true;
+						}
 					}
 				}
 
-				if (angles_set && rates_set) {
-					PX4_ERR("This driver doesn't support both, angles and rates, to be set");
-					usage();
-					return -1;
-
-				} else if (angles_set) {
-					g_thread_data->test_input->set_test_input_angles(
-						roll_deg,
-						pitch_deg,
-						yaw_deg
-					);
-					return 0;
-
-				} else if (rates_set) {
-
-					g_thread_data->test_input->set_test_input_angle_rates(
-						rollrate_deg_s,
-						pitchrate_deg_s,
-						yawrate_deg_s
-					);
-					return 0;
-
-				} else {
-					PX4_ERR("No angles or angle rates set");
+				if (!found_axis) {
 					usage();
 					return -1;
 				}
-			}
 
-		} else {
-			PX4_WARN("not running");
-			usage();
-			return 1;
-		}
-	}
-
-	else if (!strcmp(argv[1], "primary-control")) {
-
-		if (thread_running.load() && g_thread_data && g_thread_data->test_input) {
-
-			if (argc == 4) {
-				g_thread_data->control_data.sysid_primary_control = (uint8_t)strtol(argv[2], nullptr, 0);
-				g_thread_data->control_data.compid_primary_control = (uint8_t)strtol(argv[3], nullptr, 0);
-
-				PX4_INFO("Control set to: %d/%d",
-					 g_thread_data->control_data.sysid_primary_control,
-					 g_thread_data->control_data.compid_primary_control);
-
+				g_thread_data->test_input->set_test_input(angles[0], angles[1], angles[2]);
 				return 0;
-
-			} else {
-				PX4_ERR("not enough arguments");
-				usage();
-				return 1;
 			}
 
 		} else {
@@ -499,9 +426,6 @@ int gimbal_main(int argc, char *argv[])
 					}
 				}
 
-				PX4_INFO("Primary control:   %d/%d",
-					 g_thread_data->control_data.sysid_primary_control, g_thread_data->control_data.compid_primary_control);
-
 			}
 
 			if (g_thread_data->output_obj) {
@@ -529,6 +453,8 @@ void update_params(ParameterHandles &param_handles, Parameters &params)
 	param_get(param_handles.mnt_mode_out, &params.mnt_mode_out);
 	param_get(param_handles.mnt_mav_sysid_v1, &params.mnt_mav_sysid_v1);
 	param_get(param_handles.mnt_mav_compid_v1, &params.mnt_mav_compid_v1);
+	param_get(param_handles.mnt_ob_lock_mode, &params.mnt_ob_lock_mode);
+	param_get(param_handles.mnt_ob_norm_mode, &params.mnt_ob_norm_mode);
 	param_get(param_handles.mnt_man_pitch, &params.mnt_man_pitch);
 	param_get(param_handles.mnt_man_roll, &params.mnt_man_roll);
 	param_get(param_handles.mnt_man_yaw, &params.mnt_man_yaw);
@@ -554,6 +480,8 @@ bool initialize_params(ParameterHandles &param_handles, Parameters &params)
 	param_handles.mnt_mode_out = param_find("MNT_MODE_OUT");
 	param_handles.mnt_mav_sysid_v1 = param_find("MNT_MAV_SYSID");
 	param_handles.mnt_mav_compid_v1 = param_find("MNT_MAV_COMPID");
+	param_handles.mnt_ob_lock_mode = param_find("MNT_OB_LOCK_MODE");
+	param_handles.mnt_ob_norm_mode = param_find("MNT_OB_NORM_MODE");
 	param_handles.mnt_man_pitch = param_find("MNT_MAN_PITCH");
 	param_handles.mnt_man_roll = param_find("MNT_MAN_ROLL");
 	param_handles.mnt_man_yaw = param_find("MNT_MAN_YAW");
@@ -576,6 +504,8 @@ bool initialize_params(ParameterHandles &param_handles, Parameters &params)
 	    param_handles.mnt_mode_out == PARAM_INVALID ||
 	    param_handles.mnt_mav_sysid_v1 == PARAM_INVALID ||
 	    param_handles.mnt_mav_compid_v1 == PARAM_INVALID ||
+	    param_handles.mnt_ob_lock_mode == PARAM_INVALID ||
+	    param_handles.mnt_ob_norm_mode == PARAM_INVALID ||
 	    param_handles.mnt_man_pitch == PARAM_INVALID ||
 	    param_handles.mnt_man_roll == PARAM_INVALID ||
 	    param_handles.mnt_man_yaw == PARAM_INVALID ||
@@ -609,7 +539,7 @@ static void usage()
 Mount/gimbal Gimbal control driver. It maps several different input methods (eg. RC or MAVLink) to a configured
 output (eg. AUX channels or MAVLink).
 
-Documentation how to use it is on the [gimbal_control](https://docs.px4.io/main/en/advanced/gimbal_control.html) page.
+Documentation how to use it is on the [gimbal_control](https://docs.px4.io/master/en/advanced/gimbal_control.html) page.
 
 ### Examples
 Test the output by setting a angles (all omitted axes are set to 0):
@@ -618,11 +548,7 @@ $ gimbal test pitch -45 yaw 30
 
 	PRINT_MODULE_USAGE_NAME("gimbal", "driver");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_COMMAND("status");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("primary-control", "Set who is in control of gimbal");
-	PRINT_MODULE_USAGE_ARG("<sysid> <compid>", "MAVLink system ID and MAVLink component ID", false);
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test the output: set a fixed angle for one or multiple axes (gimbal must be running)");
 	PRINT_MODULE_USAGE_ARG("roll|pitch|yaw <angle>", "Specify an axis and an angle in degrees", false);
-	PRINT_MODULE_USAGE_ARG("rollrate|pitchrate|yawrate <angle rate>", "Specify an axis and an angle rate in degrees / second", false);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }

@@ -75,8 +75,7 @@ public:
 			if (safety_button.triggered) {
 				ardupilot::indication::Button Button{};
 				Button.button = ardupilot::indication::Button::BUTTON_SAFETY;
-				// NOTE: Ardupilot checks that the press time is exactly 10, PX4 checks >= 10
-				Button.press_time = 10;
+				Button.press_time = UINT8_MAX;
 				uavcan::Publisher<ardupilot::indication::Button>::broadcast(Button);
 			}
 		}

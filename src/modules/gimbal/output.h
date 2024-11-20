@@ -55,21 +55,13 @@ public:
 	explicit OutputBase(const Parameters &parameters);
 	virtual ~OutputBase() = default;
 
-	virtual void update(const ControlData &control_data, bool new_setpoints, uint8_t &gimbal_device_id) = 0;
+	virtual void update(const ControlData &control_data, bool new_setpoints) = 0;
 
 	virtual void print_status() const = 0;
 
 	void publish();
 
 	void set_stabilize(bool roll_stabilize, bool pitch_stabilize, bool yaw_stabilize);
-
-	/**
-	 * Time out if setpoint that should be streamed stops
-	 * @param control_data setpoint to check timestamp of and amend upon timeout
-	 * @param now Current system timestamp
-	 * @return true iff setpoint was amended because of timeout
-	 */
-	bool check_and_handle_setpoint_timeout(ControlData &control_data, const hrt_abstime &now);
 
 protected:
 	float _calculate_pitch(double lon, double lat, float altitude,

@@ -40,6 +40,7 @@
 #include <px4_platform_common/px4_config.h>
 
 #include <assert.h>
+#include <debug.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -60,7 +61,7 @@
 class LIS3MDL_SPI : public device::SPI
 {
 public:
-	LIS3MDL_SPI(const I2CSPIDriverConfig &config);
+	LIS3MDL_SPI(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode);
 	virtual ~LIS3MDL_SPI() = default;
 
 	virtual int     init();
@@ -69,16 +70,16 @@ public:
 };
 
 device::Device *
-LIS3MDL_SPI_interface(const I2CSPIDriverConfig &config);
+LIS3MDL_SPI_interface(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode);
 
 device::Device *
-LIS3MDL_SPI_interface(const I2CSPIDriverConfig &config)
+LIS3MDL_SPI_interface(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode)
 {
-	return new LIS3MDL_SPI(config);
+	return new LIS3MDL_SPI(bus, devid, bus_frequency, spi_mode);
 }
 
-LIS3MDL_SPI::LIS3MDL_SPI(const I2CSPIDriverConfig &config) :
-	SPI(config)
+LIS3MDL_SPI::LIS3MDL_SPI(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode) :
+	SPI(DRV_MAG_DEVTYPE_LIS3MDL, MODULE_NAME, bus, devid, spi_mode, bus_frequency)
 {
 }
 

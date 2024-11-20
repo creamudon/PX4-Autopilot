@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file shutdown.cpp
+ * @file shutdown.c
  * Tool similar to UNIX shutdown command.
  */
 #include <px4_platform_common/shutdown.h>

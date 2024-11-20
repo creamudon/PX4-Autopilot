@@ -38,3 +38,4 @@ px4_add_module(
 		hott_sensors.cpp
 	DEPENDS
 	)
+

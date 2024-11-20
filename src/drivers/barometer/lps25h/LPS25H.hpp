@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file LPS25H.hpp
+ * @file lps25h.cpp
  *
  * Driver for the LPS25H barometer connected via I2C or SPI.
  */

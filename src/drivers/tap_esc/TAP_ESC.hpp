@@ -52,6 +52,7 @@
 #include <lib/drivers/device/device.h>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <lib/mathlib/mathlib.h>
+#include <lib/cdev/CDev.hpp>
 #include <lib/led/led.h>
 #include <lib/tunes/tunes.h>
 
@@ -61,6 +62,7 @@
 #include <uORB/topics/led_control.h>
 
 #include <drivers/drv_hrt.h>
+#include <drivers/drv_mixer.h>
 
 #include "tap_esc_common.h"
 
@@ -79,7 +81,7 @@ using namespace time_literals;
 /*
  * This driver connects to TAP ESCs via serial.
  */
-class TAP_ESC : public ModuleBase<TAP_ESC>, public OutputModuleInterface
+class TAP_ESC : public cdev::CDev, public ModuleBase<TAP_ESC>, public OutputModuleInterface
 {
 public:
 	TAP_ESC(const char *device, uint8_t channels_count);
@@ -97,7 +99,8 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
-	int init();
+	int init() override;
+	int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
 
 	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated) override;

@@ -43,8 +43,6 @@
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
-using namespace time_literals;
-
 namespace gimbal
 {
 
@@ -70,7 +68,7 @@ float OutputBase::_calculate_pitch(double lon, double lat, float altitude,
 				   const vehicle_global_position_s &global_position)
 {
 	if (!_projection_reference.isInitialized()) {
-		_projection_reference.initReference(global_position.lat, global_position.lon, hrt_absolute_time());
+		_projection_reference.initReference(global_position.lat, global_position.lon);
 	}
 
 	float x1, y1, x2, y2;
@@ -81,27 +79,6 @@ float OutputBase::_calculate_pitch(double lon, double lat, float altitude,
 	float z = altitude - global_position.alt;
 
 	return atan2f(z, target_distance);
-}
-
-bool OutputBase::check_and_handle_setpoint_timeout(ControlData &control_data, const hrt_abstime &now)
-{
-	bool ret = false;
-	const bool timeout = (control_data.timestamp_last_update + 2_s < now);
-	const bool type_angle = (control_data.type == ControlData::Type::Angle);
-
-	if (timeout && type_angle) {
-		// Avoid gimbal keeps on spinning if the last setpoint was angular_velocity but it times out
-		for (int i = 0; i < 3; ++i) {
-			float &vel = control_data.type_data.angle.angular_velocity[i];
-
-			if (PX4_ISFINITE(vel) && (fabsf(vel) > FLT_EPSILON)) {
-				vel = 0.f;
-				ret = true;
-			}
-		}
-	}
-
-	return ret;
 }
 
 void OutputBase::_set_angle_setpoints(const ControlData &control_data)
@@ -236,12 +213,12 @@ void OutputBase::_calculate_angle_output(const hrt_abstime &t)
 
 	float dt = math::constrain((t - _last_update) * 1.e-6f, 0.001f, 1.f);
 
-	const matrix::Quatf q_setpoint(_q_setpoint);
-	const bool q_setpoint_valid = q_setpoint.isAllFinite();
+	const bool q_setpoint_valid = PX4_ISFINITE(_q_setpoint[0]) && PX4_ISFINITE(_q_setpoint[1])
+				      && PX4_ISFINITE(_q_setpoint[2]) && PX4_ISFINITE(_q_setpoint[3]);
 	matrix::Eulerf euler_gimbal{};
 
 	if (q_setpoint_valid) {
-		euler_gimbal = q_setpoint;
+		euler_gimbal = matrix::Quatf{_q_setpoint};
 	}
 
 	for (int i = 0; i < 3; ++i) {
@@ -283,3 +260,4 @@ void OutputBase::set_stabilize(bool roll_stabilize, bool pitch_stabilize, bool y
 }
 
 } /* namespace gimbal */
+

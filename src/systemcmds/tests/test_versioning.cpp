@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file test_versioning.cpp
+ * @file test_versioning.c
  * Tests automatic versioning functionality.
  */
 

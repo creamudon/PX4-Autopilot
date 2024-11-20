@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file airspeed_calibration.h
+ * @file gyro_calibration.h
  * Airspeed sensor calibration routine
  */
 

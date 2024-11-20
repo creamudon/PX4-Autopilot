@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file FlightTaskManualAltitudeSmoothVel.cpp
+ * @file FlightManualAltitude.cpp
  */
 
 #include "FlightTaskManualAltitudeSmoothVel.hpp"
@@ -41,17 +41,17 @@
 
 using namespace matrix;
 
-bool FlightTaskManualAltitudeSmoothVel::activate(const trajectory_setpoint_s &last_setpoint)
+bool FlightTaskManualAltitudeSmoothVel::activate(const vehicle_local_position_setpoint_s &last_setpoint)
 {
 	bool ret = FlightTaskManualAltitude::activate(last_setpoint);
 
 	// Check if the previous FlightTask provided setpoints
 
 	// If the position setpoint is unknown, set to the current postion
-	float z_sp_last = PX4_ISFINITE(last_setpoint.position[2]) ? last_setpoint.position[2] : _position(2);
+	float z_sp_last = PX4_ISFINITE(last_setpoint.z) ? last_setpoint.z : _position(2);
 
 	// If the velocity setpoint is unknown, set to the current velocity
-	float vz_sp_last = PX4_ISFINITE(last_setpoint.velocity[2]) ? last_setpoint.velocity[2] : _velocity(2);
+	float vz_sp_last = PX4_ISFINITE(last_setpoint.vz) ? last_setpoint.vz : _velocity(2);
 
 	// No acceleration estimate available, set to zero if the setpoint is NAN
 	float az_sp_last = PX4_ISFINITE(last_setpoint.acceleration[2]) ? last_setpoint.acceleration[2] : 0.f;
@@ -106,15 +106,5 @@ void FlightTaskManualAltitudeSmoothVel::_setOutputState()
 	_jerk_setpoint(2) = _smoothing.getCurrentJerk();
 	_acceleration_setpoint(2) = _smoothing.getCurrentAcceleration();
 	_velocity_setpoint(2) = _smoothing.getCurrentVelocity();
-
-	if (!_terrain_hold) {
-		if (_terrain_hold_previous) {
-			// Reset position setpoint to current position when switching from terrain hold to non-terrain hold
-			_smoothing.setCurrentPosition(_position(2));
-		}
-
-		_position_setpoint(2) = _smoothing.getCurrentPosition();
-	}
-
-	_terrain_hold_previous = _terrain_hold;
+	_position_setpoint(2) = _smoothing.getCurrentPosition();
 }

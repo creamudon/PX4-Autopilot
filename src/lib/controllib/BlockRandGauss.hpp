@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file BlockRandGauss.hpp
+ * @file blocks.h
  *
  * Controller library code
  */

@@ -33,11 +33,10 @@
 
 #pragma once
 
-#include <Integrator.hpp>
+#include "Integrator.hpp"
 
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/mathlib/math/WelfordMean.hpp>
-#include <lib/mathlib/math/WelfordMeanVector.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/sensor_calibration/Accelerometer.hpp>
@@ -93,9 +92,6 @@ private:
 	void SensorCalibrationSaveAccel();
 	void SensorCalibrationSaveGyro();
 
-	// return the square of two floating point numbers
-	static constexpr float sq(float var) { return var * var; }
-
 	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
 	uORB::PublicationMulti<vehicle_imu_status_s> _vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
 
@@ -114,8 +110,8 @@ private:
 	calibration::Accelerometer _accel_calibration{};
 	calibration::Gyroscope _gyro_calibration{};
 
-	sensors::Integrator       _accel_integrator{};
-	sensors::IntegratorConing _gyro_integrator{};
+	Integrator       _accel_integrator{};
+	IntegratorConing _gyro_integrator{};
 
 	uint32_t _imu_integration_interval_us{5000};
 
@@ -123,17 +119,16 @@ private:
 	hrt_abstime _gyro_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_last{0};
 
-	math::WelfordMeanVector<float, 3> _raw_accel_mean{};
-	math::WelfordMeanVector<float, 3> _raw_gyro_mean{};
+	math::WelfordMean<float, 3> _raw_accel_mean{};
+	math::WelfordMean<float, 3> _raw_gyro_mean{};
 
-	math::WelfordMean<float> _accel_mean_interval_us{};
-	math::WelfordMean<float> _accel_fifo_mean_interval_us{};
+	math::WelfordMean<float, 2> _accel_interval_mean{};
+	math::WelfordMean<float, 2> _gyro_interval_mean{};
 
-	math::WelfordMean<float> _gyro_mean_interval_us{};
-	math::WelfordMean<float> _gyro_fifo_mean_interval_us{};
+	math::WelfordMean<float, 2> _gyro_update_latency_mean{};
 
-	math::WelfordMean<float> _gyro_update_latency_mean_us{};
-	math::WelfordMean<float> _gyro_publish_latency_mean_us{};
+	float _accel_interval_best_variance{(float)INFINITY};
+	float _gyro_interval_best_variance{(float)INFINITY};
 
 	float _accel_interval_us{NAN};
 	float _gyro_interval_us{NAN};
@@ -155,17 +150,10 @@ private:
 	float _coning_norm_accum{0};
 	float _coning_norm_accum_total_time_s{0};
 
-	uint8_t     _delta_angle_clipping{0};
-	uint8_t     _delta_velocity_clipping{0};
+	uint8_t _delta_velocity_clipping{0};
 
-	bool _notify_clipping{true};
-
-	hrt_abstime _last_accel_clipping_notify_time{0};
-	hrt_abstime _last_gyro_clipping_notify_time{0};
-
-	uint64_t    _last_accel_clipping_notify_total_count{0};
-	uint64_t    _last_gyro_clipping_notify_total_count{0};
-
+	hrt_abstime _last_clipping_notify_time{0};
+	uint64_t _last_clipping_notify_total_count{0};
 	orb_advert_t _mavlink_log_pub{nullptr};
 
 	uint32_t _backup_schedule_timeout_us{20000};
@@ -173,7 +161,7 @@ private:
 	bool _data_gap{false};
 	bool _update_integrator_config{true};
 	bool _intervals_configured{false};
-	bool _publish_status{true};
+	bool _publish_status{false};
 
 	const uint8_t _instance;
 
@@ -200,8 +188,7 @@ private:
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate,
-		(ParamBool<px4::params::SENS_IMU_AUTOCAL>) _param_sens_imu_autocal,
-		(ParamBool<px4::params::SENS_IMU_CLPNOTI>) _param_sens_imu_notify_clipping
+		(ParamBool<px4::params::SENS_IMU_AUTOCAL>) _param_sens_imu_autocal
 	)
 };
 

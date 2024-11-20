@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014-2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2014-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,12 +41,14 @@
 
 #pragma once
 
-// Return magnetic declination in degrees
-float get_mag_declination_degrees(float latitude_deg, float longitude_deg);
+// Return magnetic declination in degrees or radians
+float get_mag_declination_degrees(float lat, float lon);
+float get_mag_declination_radians(float lat, float lon);
 
-// Return magnetic field inclination in degrees
-float get_mag_inclination_degrees(float latitude_deg, float longitude_deg);
+// Return magnetic field inclination in degrees or radians
+float get_mag_inclination_degrees(float lat, float lon);
+float get_mag_inclination_radians(float lat, float lon);
 
 // return magnetic field strength in Gauss or Tesla
-float get_mag_strength_gauss(float latitude_deg, float longitude_deg);
-float get_mag_strength_tesla(float latitude_deg, float longitude_deg);
+float get_mag_strength_gauss(float lat, float lon);
+float get_mag_strength_tesla(float lat, float lon);

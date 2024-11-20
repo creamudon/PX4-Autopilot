@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file BlockHighPass.cpp
+ * @file blocks.cpp
  *
  * Controller library code
  */
@@ -47,7 +47,7 @@ namespace control
 
 float BlockHighPass::update(float input)
 {
-	float b = 2 * M_PI_F * getFCut() * getDt();
+	float b = 2 * float(M_PI) * getFCut() * getDt();
 	float a = 1 / (1 + b);
 	setY(a * (getY() + input - getU()));
 	setU(input);

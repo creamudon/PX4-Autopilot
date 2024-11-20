@@ -68,14 +68,13 @@ bool McAutotuneAttitudeControl::init()
 
 void McAutotuneAttitudeControl::reset()
 {
-	_param_mc_at_start.reset();
 }
 
 void McAutotuneAttitudeControl::Run()
 {
 	if (should_exit()) {
 		_parameter_update_sub.unregisterCallback();
-		_vehicle_torque_setpoint_sub.unregisterCallback();
+		_actuator_controls_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
 	}
@@ -93,7 +92,7 @@ void McAutotuneAttitudeControl::Run()
 
 	// new control data needed every iteration
 	if (_state == state::idle
-	    || !_vehicle_torque_setpoint_sub.updated()) {
+	    || !_actuator_controls_sub.updated()) {
 		return;
 	}
 
@@ -113,17 +112,17 @@ void McAutotuneAttitudeControl::Run()
 		}
 	}
 
-	vehicle_torque_setpoint_s vehicle_torque_setpoint;
+	actuator_controls_s controls;
 	vehicle_angular_velocity_s angular_velocity;
 
-	if (!_vehicle_torque_setpoint_sub.copy(&vehicle_torque_setpoint)
+	if (!_actuator_controls_sub.copy(&controls)
 	    || !_vehicle_angular_velocity_sub.copy(&angular_velocity)) {
 		return;
 	}
 
 	perf_begin(_cycle_perf);
 
-	const hrt_abstime timestamp_sample = vehicle_torque_setpoint.timestamp;
+	const hrt_abstime timestamp_sample = controls.timestamp;
 
 	// collect sample interval average for filters
 	if (_last_run > 0) {
@@ -143,15 +142,15 @@ void McAutotuneAttitudeControl::Run()
 
 	// Send data to the filters at maximum frequency
 	if (_state == state::roll) {
-		_sys_id.updateFilters(_input_scale * vehicle_torque_setpoint.xyz[0],
+		_sys_id.updateFilters(_input_scale * controls.control[actuator_controls_s::INDEX_ROLL],
 				      angular_velocity.xyz[0]);
 
 	} else if (_state == state::pitch) {
-		_sys_id.updateFilters(_input_scale * vehicle_torque_setpoint.xyz[1],
+		_sys_id.updateFilters(_input_scale * controls.control[actuator_controls_s::INDEX_PITCH],
 				      angular_velocity.xyz[1]);
 
 	} else if (_state == state::yaw) {
-		_sys_id.updateFilters(_input_scale * vehicle_torque_setpoint.xyz[2],
+		_sys_id.updateFilters(_input_scale * controls.control[actuator_controls_s::INDEX_YAW],
 				      angular_velocity.xyz[2]);
 	}
 
@@ -237,7 +236,7 @@ void McAutotuneAttitudeControl::checkFilters()
 			reset_filters = true;
 		}
 
-		if (reset_filters || !_are_filters_initialized) {
+		if (reset_filters && !_are_filters_initialized) {
 			_filter_dt = _sample_interval_avg;
 
 			const float filter_rate_hz = 1.f / _filter_dt;
@@ -446,8 +445,8 @@ void McAutotuneAttitudeControl::updateStateMachine(hrt_abstime now)
 	if (_state != state::wait_for_disarm
 	    && _state != state::idle
 	    && (((now - _state_start_time) > 20_s)
-		|| (fabsf(manual_control_setpoint.roll) > 0.05f)
-		|| (fabsf(manual_control_setpoint.pitch) > 0.05f))) {
+		|| (fabsf(manual_control_setpoint.x) > 0.05f)
+		|| (fabsf(manual_control_setpoint.y) > 0.05f))) {
 		_state = state::fail;
 		_state_start_time = now;
 	}
@@ -499,7 +498,7 @@ void McAutotuneAttitudeControl::revertParamGains()
 
 bool McAutotuneAttitudeControl::registerActuatorControlsCallback()
 {
-	if (!_vehicle_torque_setpoint_sub.registerCallback()) {
+	if (!_actuator_controls_sub.registerCallback()) {
 		PX4_ERR("callback registration failed");
 		return false;
 	}
@@ -582,7 +581,7 @@ void McAutotuneAttitudeControl::stopAutotune()
 {
 	_param_mc_at_start.set(false);
 	_param_mc_at_start.commit();
-	_vehicle_torque_setpoint_sub.unregisterCallback();
+	_actuator_controls_sub.unregisterCallback();
 }
 
 const Vector3f McAutotuneAttitudeControl::getIdentificationSignal()

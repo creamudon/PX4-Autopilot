@@ -37,3 +37,4 @@ px4_add_module(
 	SRCS
 		actuator_test.cpp
 	)
+

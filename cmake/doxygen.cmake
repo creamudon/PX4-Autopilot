@@ -59,3 +59,4 @@ if (BUILD_DOXYGEN)
 		message("Doxygen needs to be installed to generate documentation")
 	endif()
 endif()
+

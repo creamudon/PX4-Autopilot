@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,10 +46,10 @@ I2CSPIDriverBase *LIS2MDL::instantiate(const I2CSPIDriverConfig &config, int run
 	device::Device *interface = nullptr;
 
 	if (config.bus_type == BOARD_I2C_BUS) {
-		interface = LIS2MDL_I2C_interface(config);
+		interface = LIS2MDL_I2C_interface(config.bus, config.bus_frequency);
 
 	} else if (config.bus_type == BOARD_SPI_BUS) {
-		interface = LIS2MDL_SPI_interface(config);
+		interface = LIS2MDL_SPI_interface(config.bus, config.spi_devid, config.bus_frequency, config.spi_mode);
 	}
 
 	if (interface == nullptr) {
@@ -94,7 +94,6 @@ extern "C" int lis2mdl_main(int argc, char *argv[])
 	using ThisDriver = LIS2MDL;
 	int ch;
 	BusCLIArguments cli{true, true};
-	cli.i2c_address = LIS2MDLL_ADDRESS;
 	cli.default_i2c_frequency = 400000;
 	cli.default_spi_frequency = 11 * 1000 * 1000;
 
@@ -112,6 +111,8 @@ extern "C" int lis2mdl_main(int argc, char *argv[])
 		ThisDriver::print_usage();
 		return -1;
 	}
+
+	cli.i2c_address = LIS2MDLL_ADDRESS;
 
 	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_MAG_DEVTYPE_LIS2MDL);
 

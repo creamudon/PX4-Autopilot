@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014-2023 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2014 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,29 @@
  */
 
 /**
+ * Idle speed of VTOL when in multicopter mode
+ *
+ * @unit us
+ * @min 900
+ * @max 2000
+ * @increment 1
+ * @decimal 0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_IDLE_PWM_MC, 900);
+
+/**
+ * Permanent stabilization in fw mode
+ *
+ * If set to one this parameter will cause permanent attitude stabilization in fw mode.
+ * This parameter has been introduced for pure convenience sake.
+ *
+ * @boolean
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_FW_PERM_STAB, 0);
+
+/**
  * VTOL Type (Tailsitter=0, Tiltrotor=1, Standard=2)
  *
  * @value 0 Tailsitter
@@ -47,6 +70,7 @@
  * @value 2 Standard
  * @min 0
  * @max 2
+ * @decimal 0
  * @reboot_required true
  * @group VTOL Attitude Control
  */
@@ -68,7 +92,7 @@ PARAM_DEFINE_INT32(VT_ELEV_MC_LOCK, 1);
  * Time in seconds used for a transition
  *
  * @unit s
- * @min 0.1
+ * @min 0.00
  * @max 20.00
  * @increment 1
  * @decimal 2
@@ -77,21 +101,25 @@ PARAM_DEFINE_INT32(VT_ELEV_MC_LOCK, 1);
 PARAM_DEFINE_FLOAT(VT_F_TRANS_DUR, 5.0f);
 
 /**
- * Maximum duration of a back transition
+ * Duration of a back transition
  *
- * Transition is also declared over if the groundspeed drops below MPC_XY_CRUISE.
+ * Time in seconds used for a back transition
  *
  * @unit s
- * @min 0.1
+ * @min 0.00
  * @max 20.00
  * @increment 1
  * @decimal 2
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_B_TRANS_DUR, 10.0f);
+PARAM_DEFINE_FLOAT(VT_B_TRANS_DUR, 4.0f);
 
 /**
- * Target throttle value for the transition to fixed-wing flight.
+ * Target throttle value for the transition to fixed wing flight.
+ *
+ * standard vtol: pusher
+ *
+ * tailsitter, tiltrotor: main throttle
  *
  * @min 0.0
  * @max 1.0
@@ -102,9 +130,29 @@ PARAM_DEFINE_FLOAT(VT_B_TRANS_DUR, 10.0f);
 PARAM_DEFINE_FLOAT(VT_F_TRANS_THR, 1.0f);
 
 /**
+ * Target throttle value for the transition to hover flight.
+ *
+ * standard vtol: pusher
+ *
+ * tailsitter, tiltrotor: main throttle
+ *
+ * Note for standard vtol:
+ * For ESCs and mixers that support reverse thrust on low PWM values set this to a negative value to apply active breaking
+ * For ESCs that support thrust reversal with a control channel please set VT_B_REV_OUT and set this to a positive value to apply active breaking
+ *
+ * @min -1
+ * @max 1
+ * @increment 0.01
+ * @decimal 2
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_B_TRANS_THR, 0.0f);
+
+/**
  * Approximate deceleration during back transition
  *
- * Used to calculate back transition distance in an auto mode.
+ * The approximate deceleration during a back transition in m/s/s
+ * Used to calculate back transition distance in mission mode. A lower value will make the VTOL transition further from the destination waypoint.
  * For standard vtol and tiltrotors a controller is used to track this value during the transition.
  *
  * @unit m/s^2
@@ -150,7 +198,7 @@ PARAM_DEFINE_FLOAT(VT_ARSP_TRANS, 10.0f);
  * Time in seconds after which transition will be cancelled. Disabled if set to 0.
  *
  * @unit s
- * @min 0.1
+ * @min 0.00
  * @max 30.00
  * @increment 1
  * @decimal 2
@@ -166,75 +214,37 @@ PARAM_DEFINE_FLOAT(VT_TRANS_TIMEOUT, 15.0f);
  * @unit s
  * @min 0.0
  * @max 20.0
- * @increment 0.1
- * @decimal 1
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_TRANS_MIN_TM, 2.0f);
 
 /**
- * Quad-chute altitude
+ * QuadChute Altitude
  *
- * Minimum altitude for fixed-wing flight. When the vehicle is in fixed-wing mode
- * and the altitude drops below this altitude (relative altitude above local origin),
- * it will instantly switch back to MC mode and execute behavior defined in COM_QC_ACT.
- *
- * @unit m
+ * Minimum altitude for fixed wing flight, when in fixed wing the altitude drops below this altitude
+ * the vehicle will transition back to MC mode and enter failsafe RTL
  * @min 0.0
  * @max 200.0
- * @increment 1
- * @decimal 1
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_FW_MIN_ALT, 0.0f);
 
 /**
- * Quad-chute uncommanded descent threshold
+ * Adaptive QuadChute
  *
- * Altitude error threshold for quad-chute triggering during fixed-wing flight.
- * The check is only active if altitude is controlled and the vehicle is below the current altitude reference.
- * The altitude error is relative to the highest altitude the vehicle has achieved since it has flown below the current
- * altitude reference.
- *
- * Set to 0 do disable.
- *
- * @unit m
+ * Maximum negative altitude error for fixed wing flight. If the altitude drops below this value below the altitude setpoint
+ * the vehicle will transition back to MC mode and enter failsafe RTL.
  * @min 0.0
  * @max 200.0
- * @increment 1
- * @decimal 1
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_QC_ALT_LOSS, 0.0f);
+PARAM_DEFINE_FLOAT(VT_FW_ALT_ERR, 0.0f);
 
 /**
- * Quad-chute transition altitude loss threshold
+ * QuadChute Max Pitch
  *
- * Altitude loss threshold for quad-chute triggering during VTOL transition to fixed-wing flight
- * in altitude-controlled flight modes.
- * Active until 5s after completing transition to fixed-wing.
- * If the current altitude is more than this value below the altitude at the beginning of the
- * transition, it will instantly switch back to MC mode and execute behavior defined in COM_QC_ACT.
- *
- * Set to 0 do disable this threshold.
- *
- * @unit m
- * @min 0
- * @max 50
- * @increment 1
- * @decimal 1
- * @group VTOL Attitude Control
- */
-PARAM_DEFINE_FLOAT(VT_QC_T_ALT_LOSS, 20.0f);
-
-/**
- * Quad-chute max pitch threshold
- *
- * Absolute pitch threshold for quad-chute triggering in FW mode.
- * Above this the vehicle will transition back to MC mode and execute behavior defined in COM_QC_ACT.
- * Set to 0 do disable this threshold.
- *
- * @unit deg
+ * Maximum pitch angle before QuadChute engages
+ * Above this the vehicle will transition back to MC mode and enter failsafe RTL
  * @min 0
  * @max 180
  * @group VTOL Attitude Control
@@ -242,13 +252,10 @@ PARAM_DEFINE_FLOAT(VT_QC_T_ALT_LOSS, 20.0f);
 PARAM_DEFINE_INT32(VT_FW_QC_P, 0);
 
 /**
- * Quad-chute max roll threshold
+ * QuadChute Max Roll
  *
- * Absolute roll threshold for quad-chute triggering in FW mode.
- * Above this the vehicle will transition back to MC mode and execute behavior defined in COM_QC_ACT.
- * Set to 0 do disable this threshold.
- *
- * @unit deg
+ * Maximum roll angle before QuadChute engages
+ * Above this the vehicle will transition back to MC mode and enter failsafe RTL
  * @min 0
  * @max 180
  * @group VTOL Attitude Control
@@ -256,138 +263,124 @@ PARAM_DEFINE_INT32(VT_FW_QC_P, 0);
 PARAM_DEFINE_INT32(VT_FW_QC_R, 0);
 
 /**
- * Quad-chute maximum height
- *
- * Maximum height above the ground (if available, otherwise above
- * Home if available, otherwise above the local origin) where triggering a quad-chute is possible.
- * At high altitudes there is a big risk to deplete the battery and therefore crash if quad-chuting there.
- *
- * @unit m
- * @min 0
- * @increment 1
- * @group VTOL Attitude Control
- */
-PARAM_DEFINE_INT32(VT_FW_QC_HMAX, 0);
-
-/**
- * Airspeed-less front transition time (open loop)
+ * Airspeed less front transition time (open loop)
  *
  * The duration of the front transition when there is no airspeed feedback available.
  *
  * @unit s
  * @min 1.0
  * @max 30.0
- * @increment 0.5
- * @decimal 1
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_F_TR_OL_TM, 6.0f);
 
 /**
- * Differential thrust in forwards flight.
- *
- * Enable differential thrust seperately for roll, pitch, yaw in forward (fixed-wing) mode.
- * The effectiveness of differential thrust around the corresponding axis can be
- * tuned by setting VT_FW_DIFTHR_S_R / VT_FW_DIFTHR_S_P / VT_FW_DIFTHR_S_Y.
+ * The channel number of motors that must be turned off in fixed wing mode.
  *
  * @min 0
- * @max 7
- * @bit 0 Yaw
- * @bit 1 Roll
- * @bit 2 Pitch
+ * @max 12345678
+ * @increment 1
+ * @decimal 0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_FW_MOT_OFFID, 0);
+
+/**
+ * The channel number of motors which provide lift during hover.
+ *
+ * @min 0
+ * @max 12345678
+ * @increment 1
+ * @decimal 0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_MOT_ID, 0);
+
+/**
+ * Differential thrust in forwards flight.
+ *
+ * Set to 1 to enable differential thrust in fixed-wing flight.
+ *
+ * @min 0
+ * @max 1
+ * @decimal 0
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_INT32(VT_FW_DIFTHR_EN, 0);
 
 /**
- * Roll differential thrust factor in forward flight
+ * Differential thrust scaling factor
  *
- * Differential thrust in forward flight is enabled via VT_FW_DIFTHR_EN.
+ * This factor specifies how the yaw input gets mapped to differential thrust in forwards flight.
  *
  * @min 0.0
- * @max 2.0
+ * @max 1.0
  * @decimal 2
  * @increment 0.1
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_S_R, 1.f);
+PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_SC, 0.1f);
 
 /**
- * Pitch differential thrust factor in forward flight
+ * Backtransition deceleration setpoint to pitch feedforward gain.
  *
- * Differential thrust in forward flight is enabled via VT_FW_DIFTHR_EN.
  *
- * @min 0.0
- * @max 2.0
- * @decimal 2
- * @increment 0.1
+ * @unit rad s^2/m
+ * @min 0
+ * @max 0.2
+ * @decimal 1
+ * @increment 0.01
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_S_P, 1.f);
-
-/**
- * Yaw differential thrust factor in forward flight
- *
- * Differential thrust in forward flight is enabled via VT_FW_DIFTHR_EN.
- *
- * @min 0.0
- * @max 2.0
- * @decimal 2
- * @increment 0.1
- * @group VTOL Attitude Control
- */
-PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_S_Y, 0.1f);
+PARAM_DEFINE_FLOAT(VT_B_DEC_FF, 0.f);
 
 /**
  * Backtransition deceleration setpoint to pitch I gain.
  *
+ *
  * @unit rad s/m
  * @min 0
  * @max 0.3
- * @decimal 2
+ * @decimal 1
  * @increment 0.05
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_B_DEC_I, 0.1f);
 
 /**
- * Minimum pitch angle during hover.
+ * Enable the usage of AUX outputs for hover motors.
  *
- * Any pitch setpoint below this value is translated to a forward force by the fixed-wing forward actuation if
- * VT_FW_TRHUST_EN is set to 1.
+ * Set this parameter to true if the vehicle's hover motors are connected to the FMU (AUX) port.
+ * Not required for boards that only have a FMU, and no IO.
+ * Only applies for standard VTOL and tiltrotor.
  *
- * @unit deg
- * @min -10.0
- * @max 45.0
- * @increment 0.1
- * @decimal 1
+ * @boolean
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_PITCH_MIN, -5.0f);
+PARAM_DEFINE_INT32(VT_MC_ON_FMU, 0);
+
+/**
+ * Minimum pitch angle during hover.
+ *
+ * Minimum pitch angle during hover flight. If the desired pitch angle is is lower than this value
+ * then the fixed-wing forward actuation can be used to compensate for the missing thrust in forward direction
+ * (see VT_FW_TRHUST_EN)
+ *
+ * @min -10.0
+ * @max 45.0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_PTCH_MIN, -5.0f);
 
 /**
  * Minimum pitch angle during hover landing.
  *
- * Overrides VT_PITCH_MIN when the vehicle is in LAND mode (hovering).
- * During landing it can be beneficial to reduce the pitch angle to reduce the generated lift in head wind.
+ * Overrides  VT_PTCH_MIN when the vehicle is in LAND mode (hovering).
+ * During landing it can be beneficial to allow lower minimum pitch angles as it can avoid the wings
+ * generating too much lift and preventing the vehicle from sinking at the desired rate.
  *
- * @unit deg
  * @min -10.0
  * @max 45.0
- * @increment 0.1
- * @decimal 1
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_LND_PITCH_MIN, -5.0f);
-
-/**
- * Spoiler setting while landing (hover)
- *
- * @unit norm
- * @min -1
- * @max 1
- * @decimal 1
- * @increment 0.1
- * @group VTOL Attitude Control
- */
-PARAM_DEFINE_FLOAT(VT_SPOILER_MC_LD, 0.f);
+PARAM_DEFINE_FLOAT(VT_LND_PTCH_MIN, -5.0f);

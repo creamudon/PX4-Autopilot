@@ -115,7 +115,7 @@ private:
 #endif
 	};
 
-	TimestampedList<command_item_s, 3> _commands{};
+	TimestampedList<command_item_s> _commands{3};
 
 	bool _debug_enabled = false;
 	static constexpr uint8_t RETRIES = 3;

@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file FlightTaskManualAltitudeSmoothVel.hpp
+ * @file FlightManualAltitudeSmoothVel.hpp
  *
  * Flight task for manual controlled altitude using the velocity smoothing library
  */
@@ -48,7 +48,7 @@ public:
 	FlightTaskManualAltitudeSmoothVel() = default;
 	virtual ~FlightTaskManualAltitudeSmoothVel() = default;
 
-	bool activate(const trajectory_setpoint_s &last_setpoint) override;
+	bool activate(const vehicle_local_position_setpoint_s &last_setpoint) override;
 
 protected:
 	virtual void _updateSetpoints() override;
@@ -67,7 +67,4 @@ protected:
 					(ParamFloat<px4::params::MPC_ACC_UP_MAX>) _param_mpc_acc_up_max,
 					(ParamFloat<px4::params::MPC_ACC_DOWN_MAX>) _param_mpc_acc_down_max
 				       )
-
-private:
-	bool _terrain_hold_previous{false}; /**< true when vehicle was controlling height above a static ground position in the previous iteration */
 };

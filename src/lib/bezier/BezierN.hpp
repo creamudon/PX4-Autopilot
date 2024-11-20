@@ -34,7 +34,7 @@
  ****************************************************************************/
 
 /**
- * @file BezierN.hpp
+ * @file BerzierN.hpp
  *
  * @author Julian Kent <julian@auterion.com>
  *

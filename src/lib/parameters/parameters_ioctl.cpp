@@ -38,9 +38,6 @@
  */
 
 #define PARAM_IMPLEMENTATION
-
-#include <errno.h>
-
 #include "param.h"
 #include "parameters_ioctl.h"
 #include <px4_platform_common/defines.h>
@@ -168,7 +165,7 @@ int	param_ioctl(unsigned int cmd, unsigned long arg)
 
 	case PARAMIOCSAVEDEFAULT: {
 			paramiocsavedefault_t *data = (paramiocsavedefault_t *)arg;
-			data->ret = param_save_default(data->blocking);
+			data->ret = param_save_default();
 		}
 		break;
 

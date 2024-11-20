@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ICM42670P.hpp
+ * @file ICM42688P.hpp
  *
  * Driver for the Invensense ICM42688P connected via SPI.
  *

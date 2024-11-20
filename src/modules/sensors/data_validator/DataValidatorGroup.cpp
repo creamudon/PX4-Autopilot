@@ -153,31 +153,13 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 
 	int i = 0;
 
-	// First find the current selected sensor
-	while (next != nullptr) {
-		if (i == pre_check_best) {
-			const int prio = next->priority();
-			const float confidence = next->confidence(timestamp);
-
-			pre_check_prio = prio;
-			pre_check_confidence = confidence;
-
-			max_index = i;
-			max_confidence = confidence;
-			max_priority = prio;
-			best = next;
-			break;
-		}
-
-		next = next->sibling();
-		i++;
-	}
-
-	i = 0;
-	next = _first;
-
 	while (next != nullptr) {
 		float confidence = next->confidence(timestamp);
+
+		if (i == pre_check_best) {
+			pre_check_prio = next->priority();
+			pre_check_confidence = confidence;
+		}
 
 		/*
 		 * Switch if:
@@ -229,10 +211,6 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 				/* if this is the first time, log when we failed */
 				if (_first_failover_time == 0) {
 					_first_failover_time = timestamp;
-				}
-
-				if (max_confidence < FLT_EPSILON) {
-					max_index = -1;
 				}
 			}
 		}

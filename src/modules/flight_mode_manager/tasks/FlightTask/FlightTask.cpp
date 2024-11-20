@@ -3,11 +3,13 @@
 #include <lib/geo/geo.h>
 
 constexpr uint64_t FlightTask::_timeout;
-const trajectory_setpoint_s FlightTask::empty_trajectory_setpoint = {0, {NAN, NAN, NAN}, {NAN, NAN, NAN}, {NAN, NAN, NAN}, {NAN, NAN, NAN}, NAN, NAN};
+// First index of empty_setpoint corresponds to time-stamp and requires a finite number.
+const vehicle_local_position_setpoint_s FlightTask::empty_setpoint = {0, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, {NAN, NAN, NAN}, {NAN, NAN, NAN}, {NAN, NAN, NAN}, {}};
+
 const vehicle_constraints_s FlightTask::empty_constraints = {0, NAN, NAN, false, {}};
 const landing_gear_s FlightTask::empty_landing_gear_default_keep = {0, landing_gear_s::GEAR_KEEP, {}};
 
-bool FlightTask::activate(const trajectory_setpoint_s &last_setpoint)
+bool FlightTask::activate(const vehicle_local_position_setpoint_s &last_setpoint)
 {
 	_resetSetpoints();
 	_setDefaultConstraints();
@@ -19,8 +21,8 @@ bool FlightTask::activate(const trajectory_setpoint_s &last_setpoint)
 void FlightTask::reActivate()
 {
 	// Preserve vertical velocity while on the ground to allow descending by stick for reliable land detection
-	trajectory_setpoint_s setpoint_preserve_vertical{empty_trajectory_setpoint};
-	setpoint_preserve_vertical.velocity[2] = _velocity_setpoint(2);
+	vehicle_local_position_setpoint_s setpoint_preserve_vertical{empty_setpoint};
+	setpoint_preserve_vertical.vz = _velocity_setpoint(2);
 	activate(setpoint_preserve_vertical);
 }
 
@@ -63,13 +65,6 @@ void FlightTask::_checkEkfResetCounters()
 		_reset_counters.z = _sub_vehicle_local_position.get().z_reset_counter;
 	}
 
-	if (_sub_vehicle_local_position.get().dist_bottom_reset_counter != _reset_counters.hagl) {
-		_ekfResetHandlerHagl(_sub_vehicle_local_position.get().delta_dist_bottom);
-		_reset_counters.hagl = _sub_vehicle_local_position.get().dist_bottom_reset_counter;
-
-		_dist_to_bottom = NAN;
-	}
-
 	if (_sub_vehicle_local_position.get().vz_reset_counter != _reset_counters.vz) {
 		_ekfResetHandlerVelocityZ(_sub_vehicle_local_position.get().delta_vz);
 		_reset_counters.vz = _sub_vehicle_local_position.get().vz_reset_counter;
@@ -81,20 +76,30 @@ void FlightTask::_checkEkfResetCounters()
 	}
 }
 
-const trajectory_setpoint_s FlightTask::getTrajectorySetpoint()
+const vehicle_local_position_setpoint_s FlightTask::getPositionSetpoint()
 {
-	trajectory_setpoint_s trajectory_setpoint{};
-	trajectory_setpoint.timestamp = hrt_absolute_time();
+	/* fill position setpoint message */
+	vehicle_local_position_setpoint_s vehicle_local_position_setpoint{};
+	vehicle_local_position_setpoint.timestamp = hrt_absolute_time();
 
-	_position_setpoint.copyTo(trajectory_setpoint.position);
-	_velocity_setpoint.copyTo(trajectory_setpoint.velocity);
-	_acceleration_setpoint.copyTo(trajectory_setpoint.acceleration);
-	_jerk_setpoint.copyTo(trajectory_setpoint.jerk);
+	vehicle_local_position_setpoint.x = _position_setpoint(0);
+	vehicle_local_position_setpoint.y = _position_setpoint(1);
+	vehicle_local_position_setpoint.z = _position_setpoint(2);
 
-	trajectory_setpoint.yaw = _yaw_setpoint;
-	trajectory_setpoint.yawspeed = _yawspeed_setpoint;
+	vehicle_local_position_setpoint.vx = _velocity_setpoint(0);
+	vehicle_local_position_setpoint.vy = _velocity_setpoint(1);
+	vehicle_local_position_setpoint.vz = _velocity_setpoint(2);
 
-	return trajectory_setpoint;
+	vehicle_local_position_setpoint.yaw = _yaw_setpoint;
+	vehicle_local_position_setpoint.yawspeed = _yawspeed_setpoint;
+
+	_acceleration_setpoint.copyTo(vehicle_local_position_setpoint.acceleration);
+	_jerk_setpoint.copyTo(vehicle_local_position_setpoint.jerk);
+
+	// deprecated, only kept for output logging
+	matrix::Vector3f(NAN, NAN, NAN).copyTo(vehicle_local_position_setpoint.thrust);
+
+	return vehicle_local_position_setpoint;
 }
 
 void FlightTask::_resetSetpoints()
@@ -119,7 +124,6 @@ void FlightTask::_evaluateVehicleLocalPosition()
 
 		// yaw
 		_yaw = _sub_vehicle_local_position.get().heading;
-		_unaided_yaw = _sub_vehicle_local_position.get().unaided_heading;
 		_is_yaw_good_for_control = _sub_vehicle_local_position.get().heading_good_for_control;
 
 		// position
@@ -145,7 +149,7 @@ void FlightTask::_evaluateVehicleLocalPosition()
 		// distance to bottom
 		if (_sub_vehicle_local_position.get().dist_bottom_valid
 		    && PX4_ISFINITE(_sub_vehicle_local_position.get().dist_bottom)) {
-			_dist_to_bottom = _sub_vehicle_local_position.get().dist_bottom;
+			_dist_to_bottom =  _sub_vehicle_local_position.get().dist_bottom;
 		}
 
 		// global frame reference coordinates to enable conversions

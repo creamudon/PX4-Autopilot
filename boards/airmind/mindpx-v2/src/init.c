@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file init.c
+ * @file mindpx2_init.c
  *
  * MINDPX-specific early startup code.  This file implements the
  * board_app_initialize() function that is called early by nsh during startup.
@@ -74,6 +74,7 @@
 
 #include <px4_platform_common/init.h>
 #include <px4_platform/board_dma_alloc.h>
+#include <drivers/drv_pwm_output.h>
 #include <px4_arch/io_timer.h>
 
 /****************************************************************************

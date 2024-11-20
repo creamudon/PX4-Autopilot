@@ -10,7 +10,6 @@ parser = argparse.ArgumentParser(description="""Extract version info from git an
 generate a version header file. The working directory is expected to be
 the root of Firmware.""")
 parser.add_argument('filename', metavar='version.h', help='Header output file')
-parser.add_argument('--git_tag', help='git tag string')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                     help='Verbose output', default=False)
 parser.add_argument('--validate', dest='validate', action='store_true',
@@ -37,11 +36,8 @@ header = """
 
 
 # PX4
-if args.git_tag:
-    git_tag = args.git_tag
-else:
-    git_describe_cmd = 'git describe --exclude ext/* --always --tags --dirty'
-    git_tag = subprocess.check_output(git_describe_cmd.split(),
+git_describe_cmd = 'git describe --exclude ext/* --always --tags --dirty'
+git_tag = subprocess.check_output(git_describe_cmd.split(),
                                   stderr=subprocess.STDOUT).decode('utf-8').strip()
 
 try:
@@ -61,7 +57,17 @@ if validate:
     # now check the version format
     m = re.match(r'v([0-9]+)\.([0-9]+)\.[0-9]+(((-dev)|(-alpha[0-9]+)|(-beta[0-9]+)|(-rc[0-9]+))|'\
                  r'(-[0-9]+\.[0-9]+\.[0-9]+((-dev)|(-alpha[0-9]+)|(-beta[0-9]+)|([-]?rc[0-9]+))?))?$', git_tag_test)
-    if not m:
+    if m:
+        # format matches, check the major and minor numbers
+        major = int(m.group(1))
+        minor = int(m.group(2))
+        if major < 1 or (major == 1 and minor < 9):
+            print("")
+            print("Error: PX4 version too low, expected at least v1.9.0")
+            print("Check the git tag (current tag: '{:}')".format(git_tag_test))
+            print("")
+            sys.exit(1)
+    else:
         print("")
         print("Error: the git tag '{:}' does not match the expected format.".format(git_tag_test))
         print("")
@@ -73,7 +79,7 @@ if validate:
         print("  v1.9.0-beta1")
         print("  v1.9.0-1.0.0")
         print("  v1.9.0-1.0.0-alpha2")
-        print("See also https://docs.px4.io/main/en/dev_setup/building_px4.html#building-for-nuttx")
+        print("See also https://dev.px4.io/master/en/setup/building_px4.html#firmware_version")
         print("")
         sys.exit(1)
 
@@ -97,9 +103,9 @@ except:
 if tag_or_branch is None:
     # replace / so it can be used as directory name
     tag_or_branch = git_branch_name.replace('/', '-')
-    # either a release or main branch (used for metadata)
+    # either a release or master branch (used for metadata)
     if not tag_or_branch.startswith('release-'):
-        tag_or_branch = 'main'
+        tag_or_branch = 'master'
 
 header += f"""
 #define PX4_GIT_VERSION_STR "{git_version}"
@@ -109,7 +115,22 @@ header += f"""
 
 #define PX4_GIT_OEM_VERSION_STR  "{oem_tag}"
 
-#define PX4_GIT_TAG_OR_BRANCH_NAME "{tag_or_branch}" // special variable: git tag, release or main branch
+#define PX4_GIT_TAG_OR_BRANCH_NAME "{tag_or_branch}" // special variable: git tag, release or master branch
+"""
+
+
+# ECL
+if (os.path.exists('src/lib/ecl/.git')):
+    ecl_git_tag = subprocess.check_output('git describe --always --tags --dirty'.split(),
+                                  cwd='src/lib/ecl', stderr=subprocess.STDOUT).decode('utf-8')
+
+    ecl_git_version = subprocess.check_output('git rev-parse --verify HEAD'.split(),
+                                      cwd='src/lib/ecl', stderr=subprocess.STDOUT).decode('utf-8').strip()
+    ecl_git_version_short = ecl_git_version[0:16]
+
+    header += f"""
+#define ECL_LIB_GIT_VERSION_STR  "{ecl_git_version}"
+#define ECL_LIB_GIT_VERSION_BINARY 0x{ecl_git_version_short}
 """
 
 

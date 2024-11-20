@@ -67,10 +67,10 @@ void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel
 	const auto &wp_msg = _sub_vehicle_trajectory_waypoint.get();
 	const auto &bezier_msg = _sub_vehicle_trajectory_bezier.get();
 
-	const bool wp_msg_timeout = hrt_elapsed_time((hrt_abstime *)&wp_msg.timestamp) > TRAJECTORY_STREAM_TIMEOUT_US;
-	const bool bezier_msg_timeout = hrt_elapsed_time((hrt_abstime *)&bezier_msg.timestamp) > hrt_abstime(
-						bezier_msg.control_points[bezier_msg.bezier_order - 1].delta * 1e6f);
-	const bool avoidance_data_timeout = wp_msg_timeout && bezier_msg_timeout;
+	const bool avoidance_data_timeout =
+		hrt_elapsed_time((hrt_abstime *)&wp_msg.timestamp) > TRAJECTORY_STREAM_TIMEOUT_US &&
+		hrt_elapsed_time((hrt_abstime *)&bezier_msg.timestamp) > hrt_abstime(bezier_msg.control_points[bezier_msg.bezier_order -
+							1].delta * 1e6f);
 
 	const bool avoidance_point_valid = wp_msg.waypoints[vehicle_trajectory_waypoint_s::POINT_0].point_valid;
 	const bool avoidance_bezier_valid = bezier_msg.bezier_order > 0;
@@ -86,14 +86,11 @@ void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel
 	}
 
 	if (avoidance_invalid) {
-		if (_avoidance_activated) {
-			// Invalid point received: deactivate
-			PX4_WARN("Obstacle Avoidance system failed, loitering");
-			_publishVehicleCmdDoLoiter();
-			_avoidance_activated = false;
-		}
+		PX4_WARN("Obstacle Avoidance system failed, loitering");
+		_publishVehicleCmdDoLoiter();
 
-		if (!_failsafe_position.isAllFinite()) {
+		if (!PX4_ISFINITE(_failsafe_position(0)) || !PX4_ISFINITE(_failsafe_position(1))
+		    || !PX4_ISFINITE(_failsafe_position(2))) {
 			// save vehicle position when entering failsafe
 			_failsafe_position = _position;
 		}
@@ -102,18 +99,13 @@ void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel
 		vel_sp.setNaN();
 		yaw_sp = NAN;
 		yaw_speed_sp = NAN;
-
-		// Do nothing further - wait until activation
 		return;
 
-	} else if (!_avoidance_activated) {
-		// First setpoint has been received: activate
-		PX4_INFO("Obstacle Avoidance system activated");
+	} else {
 		_failsafe_position.setNaN();
-		_avoidance_activated = true;
 	}
 
-	if (avoidance_point_valid && !wp_msg_timeout) {
+	if (avoidance_point_valid) {
 		const auto &point0 = wp_msg.waypoints[vehicle_trajectory_waypoint_s::POINT_0];
 		pos_sp = Vector3f(point0.position);
 		vel_sp = Vector3f(point0.velocity);
@@ -124,7 +116,8 @@ void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel
 			yaw_speed_sp = point0.yaw_speed;
 		}
 
-	} else if (avoidance_bezier_valid && !bezier_msg_timeout) {
+	} else if (avoidance_bezier_valid) {
+
 		float yaw = NAN, yaw_speed = NAN;
 		_generateBezierSetpoints(pos_sp, vel_sp, yaw, yaw_speed);
 

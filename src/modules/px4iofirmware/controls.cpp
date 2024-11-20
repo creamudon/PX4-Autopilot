@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file controls.cpp
+ * @file controls.c
  *
  * R/C inputs and servo outputs.
  *

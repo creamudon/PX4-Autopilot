@@ -33,8 +33,6 @@
 
 #include "CameraFeedback.hpp"
 
-using namespace time_literals;
-
 CameraFeedback::CameraFeedback() :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::hp_default)
@@ -114,39 +112,11 @@ CameraFeedback::Run()
 		}
 
 		// Fill attitude data
-		gimbal_device_attitude_status_s gimbal{};
-
-		if (_gimbal_sub.copy(&gimbal) && (hrt_elapsed_time(&gimbal.timestamp) < 1_s)) {
-			if (gimbal.device_flags & gimbal_device_attitude_status_s::DEVICE_FLAGS_YAW_LOCK) {
-				// Gimbal yaw angle is absolute angle relative to North
-				capture.q[0] = gimbal.q[0];
-				capture.q[1] = gimbal.q[1];
-				capture.q[2] = gimbal.q[2];
-				capture.q[3] = gimbal.q[3];
-
-			} else {
-				// Gimbal quaternion frame is in the Earth frame rotated so that the x-axis is pointing
-				// forward (yaw relative to vehicle). Get heading from the vehicle attitude and combine it
-				// with the gimbal orientation.
-				const matrix::Eulerf euler_vehicle(matrix::Quatf(att.q));
-				const matrix::Quatf q_heading(matrix::Eulerf(0.0f, 0.0f, euler_vehicle(2)));
-				matrix::Quatf q_gimbal(gimbal.q);
-				q_gimbal = q_heading * q_gimbal;
-
-				capture.q[0] = q_gimbal(0);
-				capture.q[1] = q_gimbal(1);
-				capture.q[2] = q_gimbal(2);
-				capture.q[3] = q_gimbal(3);
-			}
-
-		} else {
-			// No gimbal orientation, use vehicle attitude
-			capture.q[0] = att.q[0];
-			capture.q[1] = att.q[1];
-			capture.q[2] = att.q[2];
-			capture.q[3] = att.q[3];
-		}
-
+		// TODO : this needs to be rotated by camera orientation or set to gimbal orientation when available
+		capture.q[0] = att.q[0];
+		capture.q[1] = att.q[1];
+		capture.q[2] = att.q[2];
+		capture.q[3] = att.q[3];
 		capture.result = 1;
 
 		_capture_pub.publish(capture);
@@ -194,25 +164,6 @@ CameraFeedback::print_usage(const char *reason)
 		R"DESCR_STR(
 ### Description
 
-The camera_feedback module publishes `CameraCapture` UORB topics when image capture has been triggered.
-
-If camera capture is enabled, then trigger information from the camera capture pin is published;
-otherwise trigger information at the point the camera was commanded to trigger is published
-(from the `camera_trigger` module).
-
-The `CAMERA_IMAGE_CAPTURED` message is then emitted (by streaming code) following `CameraCapture` updates.
-`CameraCapture` topics are also logged and can be used for geotagging.
-
-### Implementation
-
-`CameraTrigger` topics are published by the `camera_trigger` module (`feedback` field set `false`)
-when image capture is triggered, and may also be published by the  `camera_capture` driver
-(with `feedback` field set `true`) if the camera capture pin is activated.
-
-The `camera_feedback` module subscribes to `CameraTrigger`.
-It discards topics from the `camera_trigger` module if camera capture is enabled.
-For the topics that are not discarded it creates a `CameraCapture` topic with the timestamp information
-from the `CameraTrigger` and position information from the vehicle.
 
 )DESCR_STR");
 

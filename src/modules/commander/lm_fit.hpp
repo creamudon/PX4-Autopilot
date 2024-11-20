@@ -33,8 +33,6 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include <matrix/matrix/math.hpp>
 #include <px4_platform_common/defines.h>
 

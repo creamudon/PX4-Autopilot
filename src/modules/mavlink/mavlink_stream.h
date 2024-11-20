@@ -129,7 +129,7 @@ protected:
 	virtual bool send() = 0;
 
 	/**
-	 * Function to collect/update data for the streams at a high rate independent of
+	 * Function to collect/update data for the streams at a high rate independant of
 	 * actual stream rate.
 	 *
 	 * This function is called at every iteration of the mavlink module.

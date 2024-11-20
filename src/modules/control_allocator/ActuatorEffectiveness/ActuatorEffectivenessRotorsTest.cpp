@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ActuatorEffectivenessRotorsTest.cpp
+ * @file ActuatorEffectivenessRotors.cpp
  *
  * Tests for Control Allocation Algorithms
  *

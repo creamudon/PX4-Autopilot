@@ -65,3 +65,4 @@ for yaml_file in yaml_files:
         print(validator.errors)
         print("")
         raise Exception("Validation of {:} failed".format(yaml_file))
+

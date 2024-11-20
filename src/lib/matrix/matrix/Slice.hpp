@@ -8,9 +8,8 @@
 
 #pragma once
 
-#include <cassert>
-#include <cstdio>
-#include <cmath>
+#include "math.hpp"
+
 
 namespace matrix
 {
@@ -21,24 +20,20 @@ class Matrix;
 template<typename Type, size_t M>
 class Vector;
 
-template <typename MatrixT, typename Type, size_t P, size_t Q, size_t M, size_t N>
-class SliceT
+template <typename Type, size_t P, size_t Q, size_t M, size_t N>
+class Slice
 {
 public:
-	using Self = SliceT<MatrixT, Type, P, Q, M, N>;
-
-	SliceT(size_t x0, size_t y0, MatrixT *data) :
+	Slice(size_t x0, size_t y0, const Matrix<Type, M, N> *data) :
 		_x0(x0),
 		_y0(y0),
-		_data(data)
+		_data(const_cast<Matrix<Type, M, N>*>(data))
 	{
 		static_assert(P <= M, "Slice rows bigger than backing matrix");
 		static_assert(Q <= N, "Slice cols bigger than backing matrix");
 		assert(x0 + P <= M);
 		assert(y0 + Q <= N);
 	}
-
-	SliceT(const Self &other) = default;
 
 	const Type &operator()(size_t i, size_t j) const
 	{
@@ -49,6 +44,7 @@ public:
 	}
 
 	Type &operator()(size_t i, size_t j)
+
 	{
 		assert(i < P);
 		assert(j < Q);
@@ -56,16 +52,10 @@ public:
 		return (*_data)(_x0 + i, _y0 + j);
 	}
 
-	// Separate function needed otherwise the default copy constructor matches before the deep copy implementation
-	Self &operator=(const Self &other)
-	{
-		return this->operator=<M, N>(other);
-	}
-
 	template<size_t MM, size_t NN>
-	Self &operator=(const SliceT<Matrix<Type, MM, NN>, Type, P, Q, MM, NN> &other)
+	Slice<Type, P, Q, M, N> &operator=(const Slice<Type, P, Q, MM, NN> &other)
 	{
-		Self &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -76,10 +66,9 @@ public:
 		return self;
 	}
 
-	template<size_t MM, size_t NN>
-	SliceT<MatrixT, Type, P, Q, M, N> &operator=(const SliceT<const Matrix<Type, MM, NN>, Type, P, Q, MM, NN> &other)
+	Slice<Type, P, Q, M, N> &operator=(const Matrix<Type, P, Q> &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -90,22 +79,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator=(const Matrix<Type, P, Q> &other)
+	Slice<Type, P, Q, M, N> &operator=(const Type &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
-
-		for (size_t i = 0; i < P; i++) {
-			for (size_t j = 0; j < Q; j++) {
-				self(i, j) = other(i, j);
-			}
-		}
-
-		return self;
-	}
-
-	SliceT<MatrixT, Type, P, Q, M, N> &operator=(const Type &other)
-	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -116,44 +92,11 @@ public:
 		return self;
 	}
 
-	template<size_t MM, size_t NN>
-	Matrix<Type, P, Q> operator-(const SliceT<const Matrix<Type, MM, NN>, Type, P, Q, MM, NN> &other)
-	{
-		return Matrix<Type, P, Q> {*this} - other;
-	}
-
-
-	Matrix<Type, P, Q> operator-(const Matrix<Type, P, Q> &other)
-	{
-		return Matrix<Type, P, Q> {*this} - other;
-	}
-
-	Matrix<Type, P, Q> operator-(const Type &other)
-	{
-		return Matrix<Type, P, Q> {*this} - other;
-	}
-
-	template<size_t MM, size_t NN>
-	Matrix<Type, P, Q> operator+(const SliceT<const Matrix<Type, MM, NN>, Type, P, Q, MM, NN> &other)
-	{
-		return Matrix<Type, P, Q> {*this} + other;
-	}
-
-	Matrix<Type, P, Q> operator+(const Matrix<Type, P, Q> &other)
-	{
-		return Matrix<Type, P, Q> {*this} + other;
-	}
-
-	Matrix<Type, P, Q> operator+(const Type &other)
-	{
-		return Matrix<Type, P, Q> {*this} + other;
-	}
-
 	// allow assigning vectors to a slice that are in the axis
 	template <size_t DUMMY = 1> // make this a template function since it only exists for some instantiations
-	SliceT<MatrixT, Type, 1, Q, M, N> &operator=(const Vector<Type, Q> &other)
+	Slice<Type, 1, Q, M, N> &operator=(const Vector<Type, Q> &other)
 	{
-		SliceT<MatrixT, Type, 1, Q, M, N> &self = *this;
+		Slice<Type, 1, Q, M, N> &self = *this;
 
 		for (size_t j = 0; j < Q; j++) {
 			self(0, j) = other(j);
@@ -163,9 +106,9 @@ public:
 	}
 
 	template<size_t MM, size_t NN>
-	SliceT<MatrixT, Type, P, Q, M, N> &operator+=(const SliceT<MatrixT, Type, P, Q, MM, NN> &other)
+	Slice<Type, P, Q, M, N> &operator+=(const Slice<Type, P, Q, MM, NN> &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -176,9 +119,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator+=(const Matrix<Type, P, Q> &other)
+	Slice<Type, P, Q, M, N> &operator+=(const Matrix<Type, P, Q> &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -189,9 +132,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator+=(const Type &other)
+	Slice<Type, P, Q, M, N> &operator+=(const Type &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -203,9 +146,9 @@ public:
 	}
 
 	template<size_t MM, size_t NN>
-	SliceT<MatrixT, Type, P, Q, M, N> &operator-=(const SliceT<MatrixT, Type, P, Q, MM, NN> &other)
+	Slice<Type, P, Q, M, N> &operator-=(const Slice<Type, P, Q, MM, NN> &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -216,9 +159,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator-=(const Matrix<Type, P, Q> &other)
+	Slice<Type, P, Q, M, N> &operator-=(const Matrix<Type, P, Q> &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -229,9 +172,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator-=(const Type &other)
+	Slice<Type, P, Q, M, N> &operator-=(const Type &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -242,9 +185,9 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator*=(const Type &other)
+	Slice<Type, P, Q, M, N> &operator*=(const Type &other)
 	{
-		SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -255,36 +198,46 @@ public:
 		return self;
 	}
 
-	SliceT<MatrixT, Type, P, Q, M, N> &operator/=(const Type &scalar)
+	Slice<Type, P, Q, M, N> &operator/=(const Type &other)
 	{
-		return operator*=(Type(1) / scalar);
+		return operator*=(Type(1) / other);
 	}
 
-	Matrix<Type, P, Q> operator*(const Type &scalar) const
+	Matrix<Type, P, Q> operator*(const Type &other) const
 	{
-		return Matrix<Type, P, Q> {*this} * scalar;
+		const Slice<Type, P, Q, M, N> &self = *this;
+		Matrix<Type, P, Q> res;
+
+		for (size_t i = 0; i < P; i++) {
+			for (size_t j = 0; j < Q; j++) {
+				res(i, j) = self(i, j) * other;
+			}
+		}
+
+		return res;
 	}
 
-	Matrix<Type, P, Q> operator/(const Type &scalar) const
+	Matrix<Type, P, Q> operator/(const Type &other) const
 	{
-		return (*this) * (1 / scalar);
+		const Slice<Type, P, Q, M, N> &self = *this;
+		return self * (Type(1) / other);
 	}
 
 	template<size_t R, size_t S>
-	const SliceT<MatrixT, Type, R, S, M, N> slice(size_t x0, size_t y0) const
+	const Slice<Type, R, S, M, N> slice(size_t x0, size_t y0) const
 	{
-		return SliceT<MatrixT, Type, R, S, M, N>(x0 + _x0, y0 + _y0, _data);
+		return Slice<Type, R, S, M, N>(x0 + _x0, y0 + _y0, _data);
 	}
 
 	template<size_t R, size_t S>
-	SliceT<MatrixT, Type, R, S, M, N> slice(size_t x0, size_t y0)
+	Slice<Type, R, S, M, N> slice(size_t x0, size_t y0)
 	{
-		return SliceT<MatrixT, Type, R, S, M, N>(x0 + _x0, y0 + _y0, _data);
+		return Slice<Type, R, S, M, N>(x0 + _x0, y0 + _y0, _data);
 	}
 
 	void copyTo(Type dst[P * Q]) const
 	{
-		const SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		const Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -295,7 +248,7 @@ public:
 
 	void copyToColumnMajor(Type dst[P * Q]) const
 	{
-		const SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		const Slice<Type, P, Q, M, N> &self = *this;
 
 		for (size_t i = 0; i < P; i++) {
 			for (size_t j = 0; j < Q; j++) {
@@ -306,7 +259,7 @@ public:
 
 	Vector < Type, P < Q ? P : Q > diag() const
 	{
-		const SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		const Slice<Type, P, Q, M, N> &self = *this;
 		Vector < Type, P < Q ? P : Q > res;
 
 		for (size_t j = 0; j < (P < Q ? P : Q); j++) {
@@ -318,7 +271,7 @@ public:
 
 	Type norm_squared() const
 	{
-		const SliceT<MatrixT, Type, P, Q, M, N> &self = *this;
+		const Slice<Type, P, Q, M, N> &self = *this;
 		Type accum(0);
 
 		for (size_t i = 0; i < P; i++) {
@@ -332,7 +285,7 @@ public:
 
 	Type norm() const
 	{
-		return std::sqrt(norm_squared());
+		return matrix::sqrt(norm_squared());
 	}
 
 	bool longerThan(Type testVal) const
@@ -376,13 +329,7 @@ public:
 
 private:
 	size_t _x0, _y0;
-	MatrixT *_data;
+	Matrix<Type, M, N> *_data;
 };
-
-template <typename Type, size_t P, size_t Q, size_t M, size_t N>
-using Slice = SliceT<Matrix<Type, M, N>, Type, P, Q, M, N>;
-
-template <typename Type, size_t P, size_t Q, size_t M, size_t N>
-using ConstSlice = SliceT<const Matrix<Type, M, N>, Type, P, Q, M, N>;
 
 }

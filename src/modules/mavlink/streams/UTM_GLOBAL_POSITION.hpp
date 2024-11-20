@@ -101,8 +101,8 @@ private:
 			msg.lon = global_pos.lon * 1e7;
 			msg.alt = global_pos.alt_ellipsoid * 1000.f;
 
-			msg.h_acc = math::min(global_pos.eph * 1000.0f, (float)UINT16_MAX);
-			msg.v_acc = math::min(global_pos.epv * 1000.0f, (float)UINT16_MAX);
+			msg.h_acc = global_pos.eph * 1000.f;
+			msg.v_acc = global_pos.epv * 1000.f;
 
 			msg.flags |= UTM_DATA_AVAIL_FLAGS_POSITION_AVAILABLE;
 			msg.flags |= UTM_DATA_AVAIL_FLAGS_ALTITUDE_AVAILABLE;
@@ -141,6 +141,7 @@ private:
 			bool vehicle_in_auto_mode = (vehicle_status.timestamp > 0)
 						    && (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET
 							|| vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND
+							|| vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LANDENGFAIL
 							|| vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_PRECLAND
 							|| vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION
 							|| vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER

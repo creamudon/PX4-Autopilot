@@ -73,7 +73,6 @@ protected:
 		RESET,
 		WAIT_FOR_RESET,
 		CONFIGURE,
-		FIFO_RESET,
 		FIFO_READ,
 	} _state{STATE::RESET};
 

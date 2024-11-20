@@ -40,6 +40,7 @@
 #include <px4_platform_common/px4_config.h>
 
 #include <assert.h>
+#include <debug.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>

@@ -38,3 +38,4 @@ px4_add_module(
 		usb_connected.cpp
 	DEPENDS
 	)
+

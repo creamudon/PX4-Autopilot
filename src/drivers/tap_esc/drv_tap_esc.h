@@ -37,6 +37,8 @@
 
 #include <stdint.h>
 
+#define TAP_ESC_DEVICE_PATH	"/dev/tap_esc"
+
 /* At the moment the only known use is with a current sensor */
 #define ESC_HAVE_CURRENT_SENSOR
 
@@ -105,7 +107,7 @@ typedef struct {
 	uint16_t current; // 0.0 - 200.0 A
 #endif
 #if defined(ESC_HAVE_TEMPERATURE_SENSOR)
-	uint8_t temperature; // 0 - 256 degrees Celsius
+	uint8_t temperature; // 0 - 256 degree celsius
 #endif
 } RunInfoRepsonse;
 /****** Run ***********/
@@ -230,7 +232,7 @@ typedef  struct {
  *
  * speed: -32767 - 32767 rpm
  *
- * temperature: 0 - 256 degrees Celsius (if available)
+ * temperature: 0 - 256 celsius degree (if available)
  * voltage: 0.00 - 100.00 V (if available)
  * current: 0.0 - 200.0 A (if available)
  */

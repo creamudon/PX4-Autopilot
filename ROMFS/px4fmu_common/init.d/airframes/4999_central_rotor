@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# @name Central Rotor
+#
+# @type Quadrotor x
+# @class Copter
+#
+# @maintainer Lorenz Meier <lorenz@px4.io>
+#
+# @board px4_fmu-v2 exclude
+# @board bitcraze_crazyflie exclude
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+set MIXER quad_x_central_rotor
+set PWM_OUT 1234567
+
+#servo 1
+# param set PWM_MAIN_MIN5 500
+# param set PWM_MAIN_MAX5 2500
+# param set PWM_MAIN_DIS5 1500
+param set PWM_MAIN_MIN5 900
+param set PWM_MAIN_MAX5 2100
+param set PWM_MAIN_DIS5 1500
+
+#servo 2
+param set PWM_MAIN_MIN6 500
+param set PWM_MAIN_MAX6 2500
+param set PWM_MAIN_DIS6 1500
+
+
+
+param set-default MC_ROLLRATE_P 0.18
+param set-default MC_PITCHRATE_P 0.18
+param set-default MC_ROLLRATE_I 0.15
+param set-default MC_PITCHRATE_I 0.15
+param set-default MC_ROLLRATE_D 0.003
+param set-default MC_PITCHRATE_D 0.003

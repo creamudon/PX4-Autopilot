@@ -50,12 +50,19 @@ TEST(MatrixLeastSquaresTest, 4x3)
 			  -1.f,  -1.1f,  -1.2f
 			 };
 	Matrix<float, 4, 3> A(data);
-	Vector4f b(2.0f, 3.0f, 4.0f, 5.0f);
-	Vector3f x_check(-0.69168233f, -0.26227593f, -1.03767522f);
+
+	float b_data[4] = {2.0f, 3.0f, 4.0f, 5.0f};
+	Vector<float, 4> b(b_data);
+
+	float x_check_data[3] = {-0.69168233f,
+				 -0.26227593f,
+				 -1.03767522f
+				};
+	Vector<float, 3> x_check(x_check_data);
 
 	LeastSquaresSolver<float, 4, 3> qrd = LeastSquaresSolver<float, 4, 3>(A);
 
-	Vector3f x = qrd.solve(b);
+	Vector<float, 3> x = qrd.solve(b);
 	EXPECT_EQ(x, x_check);
 }
 
@@ -68,12 +75,20 @@ TEST(MatrixLeastSquaresTest, 4x4)
 				 -1.f,  -1.1f,  -1.2f,  -1.3f
 			       };
 	Matrix<float, 4, 4> A(data);
-	Vector4f b(2.0f, 3.0f, 4.0f, 5.0f);
-	Vector4f x_check(0.97893433f, -2.80798701f, -0.03175765f, -2.19387649f);
+
+	float b_data[4] = {2.0f, 3.0f, 4.0f, 5.0f};
+	Vector<float, 4> b(b_data);
+
+	float x_check_data[4] = { 0.97893433f,
+				  -2.80798701f,
+				  -0.03175765f,
+				  -2.19387649f
+				};
+	Vector<float, 4> x_check(x_check_data);
 
 	LeastSquaresSolver<float, 4, 4> qrd = LeastSquaresSolver<float, 4, 4>(A);
 
-	Vector4f x = qrd.solve(b);
+	Vector<float, 4> x = qrd.solve(b);
 	EXPECT_EQ(x, x_check);
 }
 

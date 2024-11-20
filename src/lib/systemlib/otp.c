@@ -49,9 +49,11 @@
 #include <math.h>
 #include <unistd.h>
 #include <string.h>  // memset
+#include "conversions.h"
 #include "otp.h"
-#include "err.h"   // warnx
+#include "err.h"   // warnx 
 #include <assert.h>
+
 
 int val_read(void *dest, volatile const void *src, int bytes)
 {
@@ -143,6 +145,8 @@ int lock_otp(void)
 	return errors;
 }
 
+
+
 // COMPLETE, BUSY, or other flash error?
 static int F_GetStatus(void)
 {
@@ -174,7 +178,7 @@ void F_unlock(void)
 	}
 }
 
-// lock the FLASH Registers
+//  lock the FLASH Registers
 void F_lock(void)
 {
 	FLASH->control |= F_CR_LOCK;
@@ -230,3 +234,6 @@ int F_write_byte(unsigned long Address, uint8_t Data)
 	//Return the Program Status
 	return !(status == F_COMPLETE);
 }
+
+
+

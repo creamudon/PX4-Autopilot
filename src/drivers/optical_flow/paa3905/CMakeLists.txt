@@ -34,8 +34,6 @@
 px4_add_module(
 	MODULE drivers__optical_flow__paa3905
 	MAIN paa3905
-	COMPILE_FLAGS
-		#-DDEBUG_BUILD
 	SRCS
 		paa3905_main.cpp
 		PAA3905.cpp

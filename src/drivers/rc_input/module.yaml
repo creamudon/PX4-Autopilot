@@ -32,3 +32,4 @@ serial_config:
         description_extended: |
             Setting this to 'Disabled' will use a board-specific default port
             for RC input.
+

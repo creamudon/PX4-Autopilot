@@ -101,16 +101,6 @@ void MagBiasEstimator::Run()
 					ScheduleOnInterval(20_ms);
 				}
 			}
-
-			bool system_calibrating = vehicle_status.calibration_enabled;
-
-			if (system_calibrating != _system_calibrating) {
-				_system_calibrating = system_calibrating;
-
-				for (auto &reset : _reset_field_estimator) {
-					reset = true;
-				}
-			}
 		}
 	}
 
@@ -140,6 +130,22 @@ void MagBiasEstimator::Run()
 		}
 	}
 
+	if (_vehicle_status_flags_sub.updated()) {
+		vehicle_status_flags_s vehicle_status_flags;
+
+		if (_vehicle_status_flags_sub.copy(&vehicle_status_flags)) {
+			bool system_calibrating = vehicle_status_flags.calibration_enabled;
+
+			if (system_calibrating != _system_calibrating) {
+				_system_calibrating = system_calibrating;
+
+				for (auto &reset : _reset_field_estimator) {
+					reset = true;
+				}
+			}
+		}
+	}
+
 	// do nothing during regular sensor calibration
 	if (_system_calibrating) {
 		return;
@@ -157,11 +163,10 @@ void MagBiasEstimator::Run()
 		bool updated = false;
 
 		for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
-			int sensor_mag_updates = 0;
 			sensor_mag_s sensor_mag;
 
-			while ((sensor_mag_updates < sensor_mag_s::ORB_QUEUE_LENGTH) && _sensor_mag_subs[mag_index].update(&sensor_mag)) {
-				sensor_mag_updates++;
+			while (_sensor_mag_subs[mag_index].update(&sensor_mag)) {
+
 				updated = true;
 
 				// apply existing mag calibration
@@ -195,7 +200,7 @@ void MagBiasEstimator::Run()
 					const Vector3f &bias = _bias_estimator[mag_index].getBias();
 					const Vector3f bias_rate = (bias - bias_prev) / dt;
 
-					if (!bias.isAllFinite() || bias.longerThan(5.f)) {
+					if (!PX4_ISFINITE(bias(0)) || !PX4_ISFINITE(bias(1)) || !PX4_ISFINITE(bias(2)) || bias.longerThan(5.f)) {
 						_reset_field_estimator[mag_index] = true;
 						_valid[mag_index] = false;
 						_time_valid[mag_index] = 0;

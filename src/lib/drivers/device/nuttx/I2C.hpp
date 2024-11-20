@@ -46,6 +46,12 @@
 
 #include <nuttx/i2c/i2c_master.h>
 
+//================ Edited by JH ================
+#include <systemlib/mavlink_log.h>
+
+//================================================
+
+
 struct I2CSPIDriverConfig;
 
 namespace device __EXPORT
@@ -115,6 +121,15 @@ private:
 
 	const uint32_t		_frequency;
 	i2c_master_s		*_dev{nullptr};
+
+	//================ Edited by JH =====================
+
+	orb_advert_t mavlink_log_pub_user=NULL;
+	char *gnc_test_str;
+	int count_d=0;
+	int count_s=0;
+
+	//==================================================
 
 };
 

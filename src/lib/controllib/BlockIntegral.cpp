@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file BlockIntegral.cpp
+ * @file blocks.cpp
  *
  * Controller library code
  */

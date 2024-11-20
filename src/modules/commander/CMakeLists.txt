@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2023 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,12 +31,8 @@
 #
 ############################################################################
 
-add_subdirectory(Arming)
-add_subdirectory(failsafe)
 add_subdirectory(failure_detector)
-add_subdirectory(HealthAndArmingChecks)
-add_subdirectory(ModeUtil)
-add_subdirectory(MulticopterThrowLaunch)
+add_subdirectory(Arming)
 
 px4_add_module(
 	MODULE modules__commander
@@ -52,31 +48,28 @@ px4_add_module(
 		esc_calibration.cpp
 		factory_calibration_storage.cpp
 		gyro_calibration.cpp
-		HomePosition.cpp
-		ModeManagement.cpp
 		level_calibration.cpp
 		lm_fit.cpp
 		mag_calibration.cpp
 		rc_calibration.cpp
 		Safety.cpp
-		UserModeIntention.cpp
+		state_machine_helper.cpp
 		worker_thread.cpp
-	MODULE_CONFIG
-		module.yaml
 	DEPENDS
-		ArmAuthorization
 		circuit_breaker
-		failsafe
 		failure_detector
 		geo
-		health_and_arming_checks
 		hysteresis
-		mode_util
-		MulticopterThrowLaunch
+		PreFlightCheck
+		ArmAuthorization
+		ArmStateMachine
+		HealthFlags
 		sensor_calibration
 		world_magnetic_model
-        atmosphere
 	)
 
+if(PX4_TESTING)
+	add_subdirectory(commander_tests)
+endif()
+
 px4_add_unit_gtest(SRC mag_calibration_test.cpp LINKLIBS modules__commander)
-px4_add_functional_gtest(SRC ModeManagementTest.cpp LINKLIBS modules__commander)

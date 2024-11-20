@@ -44,13 +44,13 @@
  */
 
 /**
- * Default take-off altitude
+ * Take-off altitude
  *
- * This is the relative altitude the system will take off to
- * if not otherwise specified.
+ * This is the minimum altitude the system will take off to.
  *
  * @unit m
  * @min 0
+ * @max 80
  * @decimal 1
  * @increment 0.5
  * @group Mission
@@ -58,36 +58,61 @@
 PARAM_DEFINE_FLOAT(MIS_TAKEOFF_ALT, 2.5f);
 
 /**
- * Mission takeoff/landing required
+ * Take-off waypoint required
  *
- * Specifies if a mission has to contain a takeoff and/or mission landing.
- * Validity of configured takeoffs/landings is checked independently of the setting here.
+ * If set, the mission feasibility checker will check for a takeoff waypoint on the mission.
  *
- * @value 0 No requirements
- * @value 1 Require a takeoff
- * @value 2 Require a landing
- * @value 3 Require a takeoff and a landing
- * @value 4 Require both a takeoff and a landing, or neither
- * @value 5 Same as previous when landed, in-air require landing only if no valid VTOL approach is present
+ * @boolean
  * @group Mission
  */
-PARAM_DEFINE_INT32(MIS_TKO_LAND_REQ, 0);
+PARAM_DEFINE_INT32(MIS_TAKEOFF_REQ, 0);
 
 /**
- * Maximal horizontal distance from Home to first waypoint
+ * Minimum Loiter altitude
  *
- * There will be a warning message if the current waypoint is more distant than MIS_DIST_1WP from Home.
- * Has no effect on mission validity.
- * Set a value of zero or less to disable.
+ * This is the minimum altitude the system will always obey. The intent is to stay out of ground effect.
+ * set to -1, if there shouldn't be a minimum loiter altitude
  *
  * @unit m
  * @min -1
- * @max 100000
+ * @max 80
+ * @decimal 1
+ * @increment 0.5
+ * @group Mission
+ */
+PARAM_DEFINE_FLOAT(MIS_LTRMIN_ALT, -1.0f);
+
+/**
+ * Maximal horizontal distance from home to first waypoint
+ *
+ * Failsafe check to prevent running mission stored from previous flight at a new takeoff location.
+ * Set a value of zero or less to disable. The mission will not be started if the current
+ * waypoint is more distant than MIS_DIST_1WP from the home position.
+ *
+ * @unit m
+ * @min 0
+ * @max 10000
  * @decimal 1
  * @increment 100
  * @group Mission
  */
-PARAM_DEFINE_FLOAT(MIS_DIST_1WP, 10000);
+PARAM_DEFINE_FLOAT(MIS_DIST_1WP, 900);
+
+/**
+ * Maximal horizontal distance between waypoint
+ *
+ * Failsafe check to prevent running missions which are way too big.
+ * Set a value of zero or less to disable. The mission will not be started if any distance between
+ * two subsequent waypoints is greater than MIS_DIST_WPS.
+ *
+ * @unit m
+ * @min 0
+ * @max 10000
+ * @decimal 1
+ * @increment 100
+ * @group Mission
+ */
+PARAM_DEFINE_FLOAT(MIS_DIST_WPS, 900);
 
 /**
 * Enable yaw control of the mount. (Only affects multicopters and ROI mission items)
@@ -131,27 +156,3 @@ PARAM_DEFINE_FLOAT(MIS_YAW_TMT, -1.0f);
  * @group Mission
  */
 PARAM_DEFINE_FLOAT(MIS_YAW_ERR, 12.0f);
-
-/**
- * Timeout for a successful payload deployment acknowledgement
- *
- * @unit s
- * @min 0
- * @decimal 1
- * @increment 1
- * @group Mission
- */
-PARAM_DEFINE_FLOAT(MIS_PD_TO, 5.0f);
-
-/**
- * Landing abort min altitude
- *
- * Minimum altitude above landing point that the vehicle will climb to after an aborted landing.
- * Then vehicle will loiter in this altitude until further command is received.
- * Only applies to fixed-wing vehicles.
- *
- * @unit m
- * @min 0
- * @group Mission
- */
-PARAM_DEFINE_INT32(MIS_LND_ABRT_ALT, 30);

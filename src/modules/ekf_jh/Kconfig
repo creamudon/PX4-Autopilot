@@ -1,0 +1,12 @@
+menuconfig MODULES_EKF_JH
+	bool "ekf_jh"
+	default n
+	---help---
+		Enable support for esc_battery
+
+menuconfig USER_EKF_JH
+	bool "ekf_jh running as userspace module"
+	default y
+	depends on BOARD_PROTECTED && MODULES_EKF_JH
+	---help---
+		Put ekf_jh in userspace memory

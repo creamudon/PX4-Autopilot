@@ -60,7 +60,8 @@ public:
 	virtual UpdateResult update(unsigned int timeout_ms, ControlData &control_data, bool already_active) = 0;
 	virtual void print_status() const = 0;
 protected:
-	void control_data_set_lon_lat(ControlData &control_data, double lon, double lat, float altitude, uint64_t timestamp);
+	void control_data_set_lon_lat(ControlData &control_data, double lon, double lat, float altitude, float roll_angle = NAN,
+				      float pitch_fixed_angle = NAN);
 
 	Parameters &_parameters;
 };

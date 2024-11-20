@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 ECL Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,31 +49,17 @@ public:
 	~EkfWrapper();
 
 
-	void setBaroHeightRef();
-	void enableBaroHeightFusion();
-	void disableBaroHeightFusion();
+	void setBaroHeight();
 	bool isIntendingBaroHeightFusion() const;
 
-	void setGpsHeightRef();
-	void enableGpsHeightFusion();
-	void disableGpsHeightFusion();
+	void setGpsHeight();
 	bool isIntendingGpsHeightFusion() const;
 
-	void setRangeHeightRef();
-	void enableRangeHeightFusion();
-	void disableRangeHeightFusion();
+	void setRangeHeight();
 	bool isIntendingRangeHeightFusion() const;
 
-	void setExternalVisionHeightRef();
-	void enableExternalVisionHeightFusion();
-	/* void disableExternalVisionHeightFusion(); */
-	bool isIntendingExternalVisionHeightFusion() const;
-
-	void enableBetaFusion();
-	void disableBetaFusion();
-	bool isIntendingBetaFusion() const;
-
-	bool isIntendingAirspeedFusion() const;
+	void setVisionHeight();
+	bool isIntendingVisionHeightFusion() const;
 
 	void enableGpsFusion();
 	void disableGpsFusion();
@@ -102,30 +88,27 @@ public:
 
 	bool isIntendingMagHeadingFusion() const;
 	bool isIntendingMag3DFusion() const;
-	bool isMagHeadingConsistent() const;
 	void setMagFuseTypeNone();
-	void enableMagStrengthCheck();
-	void enableMagInclinationCheck();
-	void enableMagCheckForceWMM();
+
+	void enableExternalVisionAlignment();
+	void disableExternalVisionAlignment();
 
 	bool isWindVelocityEstimated() const;
 
+	void enableTerrainRngFusion();
+	void disableTerrainRngFusion();
 	bool isIntendingTerrainRngFusion() const;
 
+	void enableTerrainFlowFusion();
+	void disableTerrainFlowFusion();
 	bool isIntendingTerrainFlowFusion() const;
 
 	Eulerf getEulerAngles() const;
 	float getYawAngle() const;
+	matrix::Vector<float, 4> getQuaternionVariance() const;
 	int getQuaternionResetCounter() const;
 
-	void enableDragFusion();
-	void disableDragFusion();
-	void setDragFusionParameters(const float &bcoef_x, const float &bcoef_y, const float &mcoef);
-
-	float getMagHeadingNoise() const;
-
-	void enableGyroBiasEstimation();
-	void disableGyroBiasEstimation();
+	matrix::Vector3f getDeltaVelBiasVariance() const;
 
 private:
 	std::shared_ptr<Ekf> _ekf;

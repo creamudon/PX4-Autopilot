@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file HysteresisTest.cpp
+ * @file hysteresis_test.cpp
  * Tests for system timing hysteresis.
  */
 

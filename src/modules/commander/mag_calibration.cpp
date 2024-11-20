@@ -63,7 +63,7 @@
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/sensor_gps.h>
+#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/mag_worker_data.h>
 
 using namespace matrix;
@@ -106,7 +106,7 @@ int do_mag_calibration(orb_advert_t *mavlink_log_pub)
 	// Collect: As defined by configuration
 	// start with a full mask, all six bits set
 	int32_t cal_mask = (1 << 6) - 1;
-	param_get(param_find("SENS_MAG_SIDES"), &cal_mask);
+	param_get(param_find("CAL_MAG_SIDES"), &cal_mask);
 
 	// Calibrate all mags at the same time
 	if (result == PX4_OK) {
@@ -230,15 +230,18 @@ static calibrate_return check_calibration_result(float offset_x, float offset_y,
 static float get_sphere_radius()
 {
 	// if GPS is available use real field intensity from world magnetic model
-	uORB::SubscriptionMultiArray<sensor_gps_s, 3> gps_subs{ORB_ID::vehicle_gps_position};
+	uORB::SubscriptionMultiArray<vehicle_gps_position_s, 3> gps_subs{ORB_ID::vehicle_gps_position};
 
 	for (auto &gps_sub : gps_subs) {
-		sensor_gps_s gps;
+		vehicle_gps_position_s gps;
 
 		if (gps_sub.copy(&gps)) {
 			if (hrt_elapsed_time(&gps.timestamp) < 100_s && (gps.fix_type >= 2) && (gps.eph < 1000)) {
+				const double lat = gps.lat / 1.e7;
+				const double lon = gps.lon / 1.e7;
+
 				// magnetic field data returned by the geo library using the current GPS position
-				return get_mag_strength_gauss(gps.latitude_deg, gps.longitude_deg);
+				return get_mag_strength_gauss(lat, lon);
 			}
 		}
 	}
@@ -693,10 +696,10 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 
 	// Attempt to automatically determine external mag rotations
 	if (result == calibrate_return_ok) {
-		int32_t param_sens_mag_autorot = 0;
-		param_get(param_find("SENS_MAG_AUTOROT"), &param_sens_mag_autorot);
+		int32_t param_cal_mag_rot_auto = 0;
+		param_get(param_find("CAL_MAG_ROT_AUTO"), &param_cal_mag_rot_auto);
 
-		if ((worker_data.calibration_sides >= 3) && (param_sens_mag_autorot == 1)) {
+		if ((worker_data.calibration_sides >= 3) && (param_cal_mag_rot_auto == 1)) {
 
 			// find first internal mag to use as reference
 			int internal_index = -1;
@@ -768,10 +771,6 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 
 							// FALLTHROUGH
 							case ROTATION_PITCH_180_YAW_270: // skip 27, same as 10 ROTATION_ROLL_180_YAW_90
-
-							// FALLTHROUGH
-							case ROTATION_CUSTOM: // Skip, as we currently don't support detecting arbitrary euler angle orientation
-
 								MSE[r] = FLT_MAX;
 								break;
 
@@ -831,11 +830,6 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 								PX4_INFO("[cal] External Mag: %d (%" PRIu32 "), keeping manually configured rotation %" PRIu8, cur_mag,
 									 worker_data.calibration[cur_mag].device_id(), worker_data.calibration[cur_mag].rotation_enum());
 								continue;
-
-							case ROTATION_CUSTOM:
-								PX4_INFO("[cal] External Mag: %d (%" PRIu32 "), not setting rotation enum since it's specified by Euler Angle",
-									 cur_mag, worker_data.calibration[cur_mag].device_id());
-								continue; // Continue to the next mag loop
 
 							default:
 								break;
@@ -905,7 +899,7 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 
 		for (unsigned cur_mag = 0; cur_mag < MAX_MAGS; cur_mag++) {
 
-			calibration::Magnetometer &current_cal = worker_data.calibration[cur_mag];
+			auto &current_cal = worker_data.calibration[cur_mag];
 
 			if (current_cal.device_id() != 0) {
 				if (worker_data.append_to_existing_calibration) {
@@ -951,24 +945,23 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 	return result;
 }
 
-int do_mag_calibration_quick(orb_advert_t *mavlink_log_pub, float heading_radians,
-			     float latitude_deg, float longitude_deg)
+int do_mag_calibration_quick(orb_advert_t *mavlink_log_pub, float heading_radians, float latitude, float longitude)
 {
 	// magnetometer quick calibration
 	//  if GPS available use world magnetic model to zero mag offsets
 	bool mag_earth_available = false;
 
-	if (PX4_ISFINITE(latitude_deg) && PX4_ISFINITE(longitude_deg)) {
+	if (PX4_ISFINITE(latitude) && PX4_ISFINITE(longitude)) {
 		mag_earth_available = true;
 
 	} else {
 		uORB::Subscription vehicle_gps_position_sub{ORB_ID(vehicle_gps_position)};
-		sensor_gps_s gps;
+		vehicle_gps_position_s gps;
 
 		if (vehicle_gps_position_sub.copy(&gps)) {
 			if ((gps.timestamp != 0) && (gps.eph < 1000)) {
-				latitude_deg = (float)gps.latitude_deg;
-				longitude_deg = (float)gps.longitude_deg;
+				latitude = gps.lat / 1.e7f;
+				longitude = gps.lon / 1.e7f;
 				mag_earth_available = true;
 			}
 		}
@@ -979,13 +972,14 @@ int do_mag_calibration_quick(orb_advert_t *mavlink_log_pub, float heading_radian
 		return PX4_ERROR;
 
 	} else {
-		// magnetic field data returned by the geo library using the current GPS position
-		const float declination_rad = math::radians(get_mag_declination_degrees(latitude_deg, longitude_deg));
-		const float inclination_rad = math::radians(get_mag_inclination_degrees(latitude_deg, longitude_deg));
-		const float field_strength_gauss = get_mag_strength_gauss(latitude_deg, longitude_deg);
 
-		const Vector3f mag_earth_pred = Dcmf(Eulerf(0, -inclination_rad, declination_rad))
-						* Vector3f(field_strength_gauss, 0, 0);
+		// magnetic field data returned by the geo library using the current GPS position
+		const float mag_declination_gps = get_mag_declination_radians(latitude, longitude);
+		const float mag_inclination_gps = get_mag_inclination_radians(latitude, longitude);
+		const float mag_strength_gps = get_mag_strength_gauss(latitude, longitude);
+
+		const Vector3f mag_earth_pred = Dcmf(Eulerf(0, -mag_inclination_gps, mag_declination_gps)) * Vector3f(mag_strength_gps,
+						0, 0);
 
 		uORB::Subscription vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
 		vehicle_attitude_s attitude{};
@@ -1003,8 +997,8 @@ int do_mag_calibration_quick(orb_advert_t *mavlink_log_pub, float heading_radian
 			return PX4_ERROR;
 		}
 
-		calibration_log_info(mavlink_log_pub, "Assuming vehicle is facing heading %.1f degrees",
-				     (double)math::degrees(heading_radians));
+		calibration_log_critical(mavlink_log_pub, "Assuming vehicle is facing heading %.1f degrees",
+					 (double)math::radians(heading_radians));
 
 		matrix::Eulerf euler{matrix::Quatf{attitude.q}};
 		euler(2) = heading_radians;

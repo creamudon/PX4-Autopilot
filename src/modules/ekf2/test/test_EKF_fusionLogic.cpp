@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 ECL Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,10 +66,6 @@ public:
 		_ekf->set_vehicle_at_rest(true);
 
 		_sensor_simulator.runSeconds(7);
-
-		// When at rest, the strong zero velocity update keeps the local position
-		// valid. Deactivate this to test the change of validity without zvup
-		_ekf->set_vehicle_at_rest(false);
 	}
 
 	// Use this method to clean up any memory, network etc. after each test
@@ -84,13 +80,13 @@ TEST_F(EkfFusionLogicTest, doNoFusion)
 	// GIVEN: a tilt and heading aligned filter
 	// WHEN: having no aiding source
 	// THEN: EKF should not have a valid position estimate
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
 
 	_sensor_simulator.runSeconds(4);
 
 	// THEN: Local and global position should not be valid
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 }
 
 TEST_F(EkfFusionLogicTest, doGpsFusion)
@@ -104,8 +100,8 @@ TEST_F(EkfFusionLogicTest, doGpsFusion)
 	// THEN: EKF should intend to fuse GPS
 	EXPECT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
 	// THEN: Local and global position should be valid
-	EXPECT_TRUE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_TRUE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_TRUE(_ekf->local_position_is_valid());
+	EXPECT_TRUE(_ekf->global_position_is_valid());
 
 	// WHEN: GPS data is not send for 11s
 	_sensor_simulator.stopGps();
@@ -113,8 +109,8 @@ TEST_F(EkfFusionLogicTest, doGpsFusion)
 
 	// THEN: EKF should stop to intend to fuse GPS
 	EXPECT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: GPS data is send again for 11s
 	_sensor_simulator.startGps();
@@ -122,8 +118,8 @@ TEST_F(EkfFusionLogicTest, doGpsFusion)
 
 	// THEN: EKF should to intend to fuse GPS
 	EXPECT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
-	EXPECT_TRUE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_TRUE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_TRUE(_ekf->local_position_is_valid());
+	EXPECT_TRUE(_ekf->global_position_is_valid());
 
 	// WHEN: clients decides to stop GPS fusion
 	_ekf_wrapper.disableGpsFusion();
@@ -161,7 +157,7 @@ TEST_F(EkfFusionLogicTest, rejectGpsSignalJump)
 	EXPECT_TRUE(matrix::isEqual(accel_bias_new, accel_bias_old, 0.01f));
 
 	// BUT THEN: GPS fusion should reset after a while
-	// (it takes some time because vel fusion is still good)
+	// (it takes some time beacuse vel fusion is still good)
 	_sensor_simulator.runSeconds(14);
 	pos_new = _ekf->getPosition();
 	vel_new = _ekf->getVelocity();
@@ -183,7 +179,7 @@ TEST_F(EkfFusionLogicTest, fallbackFromGpsToFlow)
 	const float max_ground_distance = 50.f;
 	_ekf->set_optical_flow_limits(max_flow_rate, min_ground_distance, max_ground_distance);
 	_sensor_simulator.startFlow();
-	_sensor_simulator.startRangeFinder();
+	_sensor_simulator.startFlow();
 	_ekf_wrapper.enableFlowFusion();
 
 	_ekf->set_in_air_status(true);
@@ -195,15 +191,15 @@ TEST_F(EkfFusionLogicTest, fallbackFromGpsToFlow)
 
 	// WHEN: GPS data stops
 	_sensor_simulator.stopGps();
-	_sensor_simulator.runSeconds(10);
+	_sensor_simulator.runSeconds(2);
 
-	// THEN: GNSS fusion stops after a timing out
+	// THEN: immediately switch to flow only
 	EXPECT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
 	EXPECT_TRUE(_ekf_wrapper.isIntendingFlowFusion());
 
-	// BUT WHEN: GPS starts after passing the checks again
+	// BUT WHEN: GPS starts again
 	_sensor_simulator.startGps();
-	_sensor_simulator.runSeconds(6);
+	_sensor_simulator.runSeconds(1);
 
 	// THEN: use it again
 	EXPECT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
@@ -230,8 +226,8 @@ TEST_F(EkfFusionLogicTest, doFlowFusion)
 	// THEN: EKF should not intend to fuse flow measurements
 	EXPECT_FALSE(_ekf_wrapper.isIntendingFlowFusion());
 	// THEN: Local and global position should not be valid
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: Flow data is not send and we enable flow fusion
 	_sensor_simulator.stopFlow();
@@ -242,8 +238,8 @@ TEST_F(EkfFusionLogicTest, doFlowFusion)
 	// THEN: EKF should not intend to fuse flow
 	EXPECT_FALSE(_ekf_wrapper.isIntendingFlowFusion());
 	// THEN: Local and global position should not be valid
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: Flow data is sent and we enable flow fusion
 	_sensor_simulator.startFlow();
@@ -253,8 +249,8 @@ TEST_F(EkfFusionLogicTest, doFlowFusion)
 	// THEN: EKF should intend to fuse flow
 	EXPECT_TRUE(_ekf_wrapper.isIntendingFlowFusion());
 	// THEN: Local and global position should be valid
-	EXPECT_TRUE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_TRUE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: Stop sending flow data
 	_sensor_simulator.stopFlow();
@@ -263,8 +259,8 @@ TEST_F(EkfFusionLogicTest, doFlowFusion)
 	// THEN: EKF should not intend to fuse flow measurements
 	EXPECT_FALSE(_ekf_wrapper.isIntendingFlowFusion());
 	// THEN: Local and global position should not be valid
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 }
 
 TEST_F(EkfFusionLogicTest, doVisionPositionFusion)
@@ -279,8 +275,8 @@ TEST_F(EkfFusionLogicTest, doVisionPositionFusion)
 	EXPECT_TRUE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_TRUE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_TRUE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: stop sending vision data
 	_sensor_simulator.stopExternalVision();
@@ -291,8 +287,8 @@ TEST_F(EkfFusionLogicTest, doVisionPositionFusion)
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 }
 
 TEST_F(EkfFusionLogicTest, doVisionVelocityFusion)
@@ -307,8 +303,8 @@ TEST_F(EkfFusionLogicTest, doVisionVelocityFusion)
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_TRUE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_TRUE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_TRUE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 
 	// WHEN: stop sending vision data
 	_sensor_simulator.stopExternalVision();
@@ -319,8 +315,8 @@ TEST_F(EkfFusionLogicTest, doVisionVelocityFusion)
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 }
 
 TEST_F(EkfFusionLogicTest, doVisionHeadingFusion)
@@ -336,8 +332,8 @@ TEST_F(EkfFusionLogicTest, doVisionHeadingFusion)
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_TRUE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 	// THEN: Yaw state should be reset to vision
 	EXPECT_EQ(_ekf_wrapper.getQuaternionResetCounter(), initial_quat_reset_counter + 1);
 
@@ -350,8 +346,8 @@ TEST_F(EkfFusionLogicTest, doVisionHeadingFusion)
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionPositionFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionVelocityFusion());
 	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	EXPECT_FALSE(_ekf->isLocalHorizontalPositionValid());
-	EXPECT_FALSE(_ekf->isGlobalHorizontalPositionValid());
+	EXPECT_FALSE(_ekf->local_position_is_valid());
+	EXPECT_FALSE(_ekf->global_position_is_valid());
 	// THEN: Yaw state shoud be reset to mag
 	EXPECT_TRUE(_ekf_wrapper.isIntendingMagHeadingFusion());
 	EXPECT_EQ(_ekf_wrapper.getQuaternionResetCounter(), initial_quat_reset_counter + 2);
@@ -362,7 +358,6 @@ TEST_F(EkfFusionLogicTest, doBaroHeightFusion)
 	// GIVEN: EKF that receives baro and GPS data
 	_sensor_simulator.startGps();
 	_sensor_simulator.runSeconds(11);
-	_ekf_wrapper.enableGpsHeightFusion();
 
 	// THEN: EKF should intend to fuse baro by default
 	EXPECT_TRUE(_ekf_wrapper.isIntendingBaroHeightFusion());
@@ -401,28 +396,26 @@ TEST_F(EkfFusionLogicTest, doBaroHeightFusionTimeout)
 
 	// BUT WHEN: GPS height data is also available
 	_sensor_simulator.startGps();
-	_ekf_wrapper.enableGpsHeightFusion();
 	_sensor_simulator.runSeconds(11);
 	reset_logging_checker.capturePostResetState();
 	EXPECT_TRUE(reset_logging_checker.isVerticalVelocityResetCounterIncreasedBy(2));
-	EXPECT_TRUE(reset_logging_checker.isVerticalPositionResetCounterIncreasedBy(1));
 
 	// AND: the baro data jumps by a lot
 	_sensor_simulator._baro.setData(800.f);
 	_sensor_simulator.runSeconds(20);
 	reset_logging_checker.capturePostResetState();
 
-	// THEN: EKF should fallback to GPS height (without reset)
+	// THEN: EKF should fallback to GPS height
 	EXPECT_FALSE(_ekf_wrapper.isIntendingBaroHeightFusion());
 	EXPECT_TRUE(_ekf_wrapper.isIntendingGpsHeightFusion());
-	EXPECT_TRUE(reset_logging_checker.isVerticalVelocityResetCounterIncreasedBy(2));
-	EXPECT_TRUE(reset_logging_checker.isVerticalPositionResetCounterIncreasedBy(1));
+	EXPECT_TRUE(reset_logging_checker.isVerticalVelocityResetCounterIncreasedBy(3));
+	EXPECT_TRUE(reset_logging_checker.isVerticalPositionResetCounterIncreasedBy(2));
 }
 
 TEST_F(EkfFusionLogicTest, doGpsHeightFusion)
 {
 	// WHEN: commanding GPS height and sending GPS data
-	_ekf_wrapper.enableGpsHeightFusion();
+	_ekf_wrapper.setGpsHeight();
 	_sensor_simulator.startGps();
 	_sensor_simulator.runSeconds(11);
 
@@ -441,7 +434,7 @@ TEST_F(EkfFusionLogicTest, doGpsHeightFusion)
 TEST_F(EkfFusionLogicTest, doRangeHeightFusion)
 {
 	// WHEN: commanding range height and sending range data
-	_ekf_wrapper.enableRangeHeightFusion();
+	_ekf_wrapper.setRangeHeight();
 	_sensor_simulator.startRangeFinder();
 	_sensor_simulator.runSeconds(2.5f);
 	// THEN: EKF should intend to fuse range height
@@ -469,12 +462,12 @@ TEST_F(EkfFusionLogicTest, doRangeHeightFusion)
 TEST_F(EkfFusionLogicTest, doVisionHeightFusion)
 {
 	// WHEN: commanding vision height and sending vision data
-	_ekf_wrapper.enableExternalVisionHeightFusion();
+	_ekf_wrapper.setVisionHeight();
 	_sensor_simulator.startExternalVision();
 	_sensor_simulator.runSeconds(2);
 
 	// THEN: EKF should intend to fuse vision height
-	EXPECT_TRUE(_ekf_wrapper.isIntendingExternalVisionHeightFusion());
+	EXPECT_TRUE(_ekf_wrapper.isIntendingVisionHeightFusion());
 
 	// WHEN: stop sending vision data
 	_sensor_simulator.stopExternalVision();
@@ -482,6 +475,6 @@ TEST_F(EkfFusionLogicTest, doVisionHeightFusion)
 
 	// THEN: EKF should stop to intend to use vision height
 
-	EXPECT_FALSE(_ekf_wrapper.isIntendingExternalVisionHeightFusion());
+	EXPECT_FALSE(_ekf_wrapper.isIntendingVisionHeightFusion());
 	EXPECT_TRUE(_ekf_wrapper.isIntendingBaroHeightFusion());
 }

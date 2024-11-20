@@ -39,3 +39,4 @@ px4_add_module(
 		nshterm.cpp
 	DEPENDS
 	)
+

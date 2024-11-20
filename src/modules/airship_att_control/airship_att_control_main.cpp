@@ -45,6 +45,7 @@ using namespace matrix;
 AirshipAttitudeControl::AirshipAttitudeControl() :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
+	_actuators_0_pub(ORB_ID(actuator_controls_0)),
 	_loop_perf(perf_alloc(PC_ELAPSED, "airship_att_control"))
 {
 }
@@ -79,18 +80,36 @@ AirshipAttitudeControl::parameter_update_poll()
 	}
 }
 
+void
+AirshipAttitudeControl::publish_actuator_controls()
+{
+	// zero actuators if not armed
+	if (_vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED) {
+		for (uint8_t i = 0 ; i < 4 ; i++) {
+			_actuators.control[i] = 0.0f;
+		}
+
+	} else {
+		_actuators.control[0] = 0.0f;
+		_actuators.control[1] = _manual_control_sp.x;
+		_actuators.control[2] = _manual_control_sp.r;
+		_actuators.control[3] = _manual_control_sp.z;
+	}
+
+	// note: _actuators.timestamp_sample is set in AirshipAttitudeControl::Run()
+	_actuators.timestamp = hrt_absolute_time();
+
+	_actuators_0_pub.publish(_actuators);
+}
+
 void AirshipAttitudeControl::publishTorqueSetpoint(const hrt_abstime &timestamp_sample)
 {
 	vehicle_torque_setpoint_s v_torque_sp = {};
 	v_torque_sp.timestamp = hrt_absolute_time();
 	v_torque_sp.timestamp_sample = timestamp_sample;
-
-	// zero actuators if not armed
-	if (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
-		v_torque_sp.xyz[0] = 0.f;
-		v_torque_sp.xyz[1] = _manual_control_setpoint.pitch;
-		v_torque_sp.xyz[2] = _manual_control_setpoint.yaw;
-	}
+	v_torque_sp.xyz[0] = _actuators.control[0];
+	v_torque_sp.xyz[1] = _actuators.control[1];
+	v_torque_sp.xyz[2] = _actuators.control[2];
 
 	_vehicle_torque_setpoint_pub.publish(v_torque_sp);
 }
@@ -100,11 +119,9 @@ void AirshipAttitudeControl::publishThrustSetpoint(const hrt_abstime &timestamp_
 	vehicle_thrust_setpoint_s v_thrust_sp = {};
 	v_thrust_sp.timestamp = hrt_absolute_time();
 	v_thrust_sp.timestamp_sample = timestamp_sample;
-
-	// zero actuators if not armed
-	if (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
-		v_thrust_sp.xyz[0] = (_manual_control_setpoint.throttle + 1.f) * .5f;
-	}
+	v_thrust_sp.xyz[0] = _actuators.control[3];
+	v_thrust_sp.xyz[1] = 0.0f;
+	v_thrust_sp.xyz[2] = 0.0f;
 
 	_vehicle_thrust_setpoint_pub.publish(v_thrust_sp);
 }
@@ -125,12 +142,15 @@ AirshipAttitudeControl::Run()
 
 	if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
 
+		_actuators.timestamp_sample = angular_velocity.timestamp_sample;
+
 		/* run the rate controller immediately after a gyro update */
+		publish_actuator_controls();
 		publishTorqueSetpoint(angular_velocity.timestamp_sample);
 		publishThrustSetpoint(angular_velocity.timestamp_sample);
 
 		/* check for updates in manual control topic */
-		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
+		_manual_control_sp_sub.update(&_manual_control_sp);
 
 		/* check for updates in vehicle status topic */
 		_vehicle_status_sub.update(&_vehicle_status);
@@ -170,6 +190,8 @@ int AirshipAttitudeControl::print_status()
 
 	perf_print_counter(_loop_perf);
 
+	print_message(ORB_ID(actuator_controls), _actuators);
+
 	return 0;
 }
 
@@ -205,10 +227,7 @@ To reduce control latency, the module directly polls on the gyro topic published
 	return 0;
 }
 
-/**
- * Airship attitude control app start / stop handling function
- */
-extern "C" __EXPORT int airship_att_control_main(int argc, char *argv[])
+int airship_att_control_main(int argc, char *argv[])
 {
 	return AirshipAttitudeControl::main(argc, argv);
 }

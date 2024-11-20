@@ -8,6 +8,24 @@ serial_config:
 parameters:
     - group: DShot
       definitions:
+        DSHOT_CONFIG:
+            description:
+                short: Configure DShot
+                long: |
+                    This enables/disables DShot. The different modes define different
+                    speeds, for example DShot150 = 150kb/s. Not all ESCs support all modes.
+
+                    Note: this enables DShot on the FMU outputs. For boards with an IO it is the
+                    AUX outputs.
+            type: enum
+            values:
+                0: Disable (use PWM/Oneshot)
+                150: DShot150
+                300: DShot300
+                600: DShot600
+                1200: DShot1200
+            reboot_required: true
+            default: 0
         DSHOT_MIN:
             description:
                 short: Minimum DShot Motor Output
@@ -33,16 +51,6 @@ parameters:
                     When mixer outputs 1000 or value inside DSHOT 3D deadband, DShot 0 is sent.
             type: boolean
             default: 0
-        DSHOT_BIDIR_EN:
-            description:
-                short: Enable bidirectional DShot
-                long: |
-                    This parameter enables bidirectional DShot which provides RPM feedback.
-                    Note that this requires ESCs that support bidirectional DSHot, e.g. BlHeli32.
-                    This is not the same as DShot telemetry which requires an additional serial connection.
-            type: boolean
-            default: 0
-            reboot_required: true
         DSHOT_3D_DEAD_H:
             description:
                 short: DSHOT 3D deadband high

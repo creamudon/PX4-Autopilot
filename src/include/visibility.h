@@ -60,19 +60,14 @@
 #endif
 
 
-#define system_exit exit
-#define system_clock_gettime clock_gettime
-#define system_clock_settime clock_settime
-#define system_pthread_cond_timedwait pthread_cond_timedwait
-#define system_usleep usleep
-#define system_sleep sleep
 
-#ifndef PX4_DISABLE_GCC_POISON
+
 
 /* exit() is used on NuttX to exit a task. However on Posix, it will exit the
  * whole application, so we prevent its use there. There are cases where it
  * still needs to be used, thus we remap system_exit to exit.
  */
+#define system_exit exit
 #if !defined(__PX4_NUTTX)
 #include <stdlib.h>
 #ifdef __cplusplus
@@ -81,34 +76,37 @@
 /* We should include cstdlib or stdlib.h but this doesn't
  * compile because many C++ files include stdlib.h and would
  * need to get changed. */
-//#pragma GCC poison exit
+#pragma GCC poison exit
 #endif // !defined(__PX4_NUTTX)
 
 
 /* For SITL lockstep we fake the clock, sleeping, and timedwaits
  * Therefore, we prefix these syscalls with system_. */
 #include <time.h>
+#define system_clock_gettime clock_gettime
+#define system_clock_settime clock_settime
 /* We can't poison clock_settime/clock_gettime because they are
  * used in DriverFramework. */
 
-#if !defined(__PX4_NUTTX) && !defined(__PX4_QURT)
+#if !defined(__PX4_NUTTX)
 #include <pthread.h>
 // We can't include this for NuttX otherwise we get conflicts for read/write
 // symbols in cannode.
-// We can't include this for Qurt because it uses it's own thread primitives
-#endif // !defined(__PX4_NUTTX) && !defined(__PX4_QURT)
+#endif // !defined(__PX4_NUTTX)
 #define system_pthread_cond_timedwait pthread_cond_timedwait
 /* We can't poison pthread_cond_timedwait because it seems to be used in the
  * <string> include. */
 
 
 /* We don't poison usleep and sleep because it is used in dependencies
- * like uavcan. */
+ * like uavcan and DriverFramework. */
 #if !defined(__PX4_NUTTX)
 #include <unistd.h>
 // We can't include this for NuttX otherwise we get conflicts for read/write
 // symbols in cannode.
 #endif // !defined(__PX4_NUTTX)
+#define system_usleep usleep
+#define system_sleep sleep
 
 
 /* On NuttX we call clearenv() so we cannot use getenv() and others (see
@@ -125,5 +123,3 @@
  * need to get changed. */
 #pragma GCC poison getenv setenv putenv
 #endif // defined(__PX4_NUTTX)
-
-#endif // PX4_DISABLE_GCC_POISON

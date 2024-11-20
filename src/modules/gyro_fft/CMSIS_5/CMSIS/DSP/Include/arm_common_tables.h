@@ -514,3 +514,4 @@ extern const unsigned char hwLUT[256];
 #endif /* (defined(ARM_MATH_MVEI) || defined(ARM_MATH_HELIUM)) */
 
 #endif /*  ARM_COMMON_TABLES_H */
+

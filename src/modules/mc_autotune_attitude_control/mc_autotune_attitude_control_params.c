@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file mc_autotune_attitude_control_params.c
+ * @file autotune_attitude_control_params.c
  *
  * Parameters used by the attitude auto-tuner
  *
@@ -54,7 +54,7 @@ PARAM_DEFINE_INT32(MC_AT_EN, 0);
  * and can be dangerous. Only activate if you know what you
  * are doing, and in a safe environment.
  *
- * Any motion of the remote stick will abort the signal
+ * Any motion of the remote stick will abord the signal
  * injection and reset this parameter
  * Best is to perform the identification in position or
  * hold mode.

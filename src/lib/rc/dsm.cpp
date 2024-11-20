@@ -42,7 +42,6 @@
 #include <px4_platform_common/px4_config.h>
 #include <board_config.h>
 #include <px4_platform_common/defines.h>
-#include <px4_platform_common/log.h>
 
 #include <fcntl.h>
 #include <math.h>
@@ -481,9 +480,6 @@ void dsm_proto_init()
 		channel_buffer[i].last_seen = 0;
 		channel_buffer[i].value = 0;
 	}
-
-	/* reset the format detector */
-	dsm_guess_format(true);
 }
 
 /**

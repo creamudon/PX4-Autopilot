@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /*
- * @file circuit_breaker.cpp
+ * @file circuit_breaker.c
  *
  * Circuit breaker parameters.
  * Analog to real aviation circuit breakers these parameters
@@ -53,4 +53,9 @@ bool circuit_breaker_enabled(const char *breaker, int32_t magic)
 	int32_t val = -1;
 
 	return (param_get(param_find(breaker), &val) == 0) && (val == magic);
+}
+
+bool circuit_breaker_enabled_by_val(int32_t breaker_val, int32_t magic)
+{
+	return (breaker_val == magic);
 }

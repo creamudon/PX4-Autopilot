@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file gpio.cpp
+ * @file gpio_test.cpp
  * @author Julian Kent <julian@auterion.com>
  *
  * GPIO read and write tool
@@ -41,8 +41,6 @@
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_config.h>
-
-#include <stdlib.h>
 
 #include <nuttx/ioexpander/gpio.h>
 #include <fcntl.h>
@@ -314,8 +312,8 @@ $ gpio read H4 PULLUP
 Set the output value on Port E pin 7 to high
 $ gpio write E7 1 --force
 
-Set the output value on device /dev/gpio1 to high
-$ gpio write /dev/gpio1 1
+Set the output value on device /dev/gpin1 to high
+$ gpio write /dev/gpin1 1
 
 )DESCR_STR");
 

@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ST_LSM9DS1_Registers.hpp
+ * @file ST_LSM9DS1_registers.hpp
  *
  * ST LSM9DS1 registers.
  *

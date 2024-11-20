@@ -40,3 +40,4 @@ px4_add_module(
 		tailsitter.cpp
 		standard.cpp
 	)
+

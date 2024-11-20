@@ -136,17 +136,6 @@ void SendProtocol::update(const hrt_abstime &now)
 	uint16_t buffer_sequence = _buffer.get_latest_sequence();
 	int num_drops = 0;
 
-	if (_first_event && buffer_sequence != _latest_sequence) {
-		// If events are published before the first mavlink instance starts, they would be flagged as dropped
-		// events as the buffer initializes the sequence to the global events::initial_event_sequence,
-		// therefore reset the sequence.
-		_latest_sequence = buffer_sequence - 1;
-		_first_event = false;
-		PX4_DEBUG("Setting initial sequence to %i", _latest_sequence);
-		// Send sequence - only needed for SITL to ensure we send the sequence reset flag initially
-		send_current_sequence(now, true);
-	}
-
 	while (_latest_sequence != buffer_sequence) {
 		// only send if enough tx buffer space available
 		if (_mavlink.get_free_tx_buf() < MAVLINK_MSG_ID_EVENT_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) {
@@ -208,18 +197,17 @@ void SendProtocol::handle_request_event(const mavlink_message_t &msg) const
 
 void SendProtocol::send_event(const Event &event) const
 {
-	if (_mavlink.get_mode() != Mavlink::MAVLINK_MODE_IRIDIUM) {
-		mavlink_event_t event_msg{};
-		event_msg.event_time_boot_ms = event.timestamp_ms;
-		event_msg.destination_component = MAV_COMP_ID_ALL;
-		event_msg.destination_system = 0;
-		event_msg.id = event.id;
-		event_msg.sequence = event.sequence;
-		event_msg.log_levels = event.log_levels;
-		static_assert(sizeof(event_msg.arguments) >= sizeof(event.arguments), "MAVLink message arguments buffer too small");
-		memcpy(&event_msg.arguments, event.arguments, sizeof(event.arguments));
-		mavlink_msg_event_send_struct(_mavlink.get_channel(), &event_msg);
-	}
+	mavlink_event_t event_msg{};
+	event_msg.event_time_boot_ms = event.timestamp_ms;
+	event_msg.destination_component = MAV_COMP_ID_ALL;
+	event_msg.destination_system = 0;
+	event_msg.id = event.id;
+	event_msg.sequence = event.sequence;
+	event_msg.log_levels = event.log_levels;
+	static_assert(sizeof(event_msg.arguments) >= sizeof(event.arguments), "MAVLink message arguments buffer too small");
+	memcpy(&event_msg.arguments, event.arguments, sizeof(event.arguments));
+	mavlink_msg_event_send_struct(_mavlink.get_channel(), &event_msg);
+
 }
 
 void SendProtocol::on_gcs_connected()
@@ -227,18 +215,17 @@ void SendProtocol::on_gcs_connected()
 	send_current_sequence(hrt_absolute_time());
 }
 
-void SendProtocol::send_current_sequence(const hrt_abstime &now, bool force_reset)
+void SendProtocol::send_current_sequence(const hrt_abstime &now)
 {
-	// only send if enough tx buffer space available or not MAVLINK_MODE_IRIDIUM
-	if (_mavlink.get_free_tx_buf() < MAVLINK_MSG_ID_CURRENT_EVENT_SEQUENCE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES ||
-	    _mavlink.get_mode() == Mavlink::MAVLINK_MODE_IRIDIUM) {
+	// only send if enough tx buffer space available
+	if (_mavlink.get_free_tx_buf() < MAVLINK_MSG_ID_CURRENT_EVENT_SEQUENCE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) {
 		return;
 	}
 
 	_last_current_sequence_sent = now;
 	mavlink_current_event_sequence_t current_event_seq;
 	current_event_seq.sequence = _buffer.get_latest_sequence();
-	current_event_seq.flags = (_buffer.size() == 0 || force_reset) ? MAV_EVENT_CURRENT_SEQUENCE_FLAGS_RESET : 0;
+	current_event_seq.flags = _buffer.size() == 0 ? MAV_EVENT_CURRENT_SEQUENCE_FLAGS_RESET : 0;
 	mavlink_msg_current_event_sequence_send_struct(_mavlink.get_channel(), &current_event_seq);
 }
 

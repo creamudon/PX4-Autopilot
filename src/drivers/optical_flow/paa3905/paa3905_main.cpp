@@ -32,8 +32,6 @@
  ****************************************************************************/
 
 #include "PAA3905.hpp"
-
-#include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 
 void PAA3905::print_usage()
@@ -51,7 +49,7 @@ extern "C" __EXPORT int paa3905_main(int argc, char *argv[])
 	using ThisDriver = PAA3905;
 	BusCLIArguments cli{false, true};
 	cli.custom1 = -1;
-	cli.spi_mode = SPIDEV_MODE3;
+	cli.spi_mode = SPIDEV_MODE0;
 	cli.default_spi_frequency = SPI_SPEED;
 
 	while ((ch = cli.getOpt(argc, argv, "Y:")) != EOF) {

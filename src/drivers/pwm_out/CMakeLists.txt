@@ -49,5 +49,6 @@ px4_add_module(
 		module.yaml
 	DEPENDS
 		arch_io_pins
+		mixer
 		mixer_module
 	)

@@ -41,14 +41,22 @@
 
 using namespace matrix;
 
+FlightTaskManualPosition::FlightTaskManualPosition() : _collision_prevention(this)
+{
+
+}
+
 bool FlightTaskManualPosition::updateInitialize()
 {
 	bool ret = FlightTaskManualAltitude::updateInitialize();
 	// require valid position / velocity in xy
-	return ret && Vector2f(_position).isAllFinite() && Vector2f(_velocity).isAllFinite();
+	return ret && PX4_ISFINITE(_position(0))
+	       && PX4_ISFINITE(_position(1))
+	       && PX4_ISFINITE(_velocity(0))
+	       && PX4_ISFINITE(_velocity(1));
 }
 
-bool FlightTaskManualPosition::activate(const trajectory_setpoint_s &last_setpoint)
+bool FlightTaskManualPosition::activate(const vehicle_local_position_setpoint_s &last_setpoint)
 {
 	// all requirements from altitude-mode still have to hold
 	bool ret = FlightTaskManualAltitude::activate(last_setpoint);
@@ -67,16 +75,13 @@ void FlightTaskManualPosition::_scaleSticks()
 	/* Use same scaling as for FlightTaskManualAltitude */
 	FlightTaskManualAltitude::_scaleSticks();
 
-	Vector2f stick_xy = _sticks.getPitchRollExpo();
+	/* Constrain length of stick inputs to 1 for xy*/
+	Vector2f stick_xy = _sticks.getPositionExpo().slice<2, 1>(0, 0);
 
-	Sticks::limitStickUnitLengthXY(stick_xy);
+	const float mag = math::constrain(stick_xy.length(), 0.0f, 1.0f);
 
-	if (_param_mpc_vel_man_side.get() >= 0.f) {
-		stick_xy(1) *= _param_mpc_vel_man_side.get() / _param_mpc_vel_manual.get();
-	}
-
-	if ((_param_mpc_vel_man_back.get() >= 0.f) && (stick_xy(0) < 0.f)) {
-		stick_xy(0) *= _param_mpc_vel_man_back.get() / _param_mpc_vel_manual.get();
+	if (mag > FLT_EPSILON) {
+		stick_xy = stick_xy.normalized() * mag;
 	}
 
 	const float max_speed_from_estimator = _sub_vehicle_local_position.get().vxy_max;
@@ -91,8 +96,8 @@ void FlightTaskManualPosition::_scaleSticks()
 	// scale velocity to its maximum limits
 	Vector2f vel_sp_xy = stick_xy * velocity_scale;
 
-	// Rotate setpoint into local frame
-	Sticks::rotateIntoHeadingFrameXY(vel_sp_xy, _yaw, _yaw_setpoint);
+	/* Rotate setpoint into local frame. */
+	_rotateIntoHeadingFrame(vel_sp_xy);
 
 	// collision prevention
 	if (_collision_prevention.is_active()) {
@@ -109,14 +114,16 @@ void FlightTaskManualPosition::_updateXYlock()
 	const bool apply_brake = Vector2f(_velocity_setpoint).length() < FLT_EPSILON;
 	const bool stopped = (_param_mpc_hold_max_xy.get() < FLT_EPSILON || vel_xy_norm < _param_mpc_hold_max_xy.get());
 
-	if (apply_brake && stopped && !Vector2f(_position_setpoint).isAllFinite()) {
-		_position_setpoint.xy() = _position.xy();
+	if (apply_brake && stopped && !PX4_ISFINITE(_position_setpoint(0))) {
+		_position_setpoint(0) = _position(0);
+		_position_setpoint(1) = _position(1);
 
-	} else if (Vector2f(_position_setpoint).isAllFinite() && apply_brake) {
+	} else if (PX4_ISFINITE(_position_setpoint(0)) && apply_brake) {
 		// Position is locked but check if a reset event has happened.
 		// We will shift the setpoints.
 		if (_sub_vehicle_local_position.get().xy_reset_counter != _reset_counter) {
-			_position_setpoint.xy() = _position.xy();
+			_position_setpoint(0) = _position(0);
+			_position_setpoint(1) = _position(1);
 			_reset_counter = _sub_vehicle_local_position.get().xy_reset_counter;
 		}
 
@@ -134,15 +141,14 @@ void FlightTaskManualPosition::_updateSetpoints()
 
 	_updateXYlock(); // check for position lock
 
-	_weathervane.update();
-
-	if (_weathervane.isActive()) {
+	// check if an external yaw handler is active and if yes, let it update the yaw setpoints
+	if (_weathervane_yaw_handler != nullptr && _weathervane_yaw_handler->is_active()) {
 		_yaw_setpoint = NAN;
 
-		// only enable the weathervane to change the yawrate when position lock is active (and thus the pos. sp. aren't NAN)
-		if (Vector2f(_position_setpoint).isAllFinite()) {
+		// only enable the weathervane to change the yawrate when position lock is active (and thus the pos. sp. are NAN)
+		if (PX4_ISFINITE(_position_setpoint(0)) && PX4_ISFINITE(_position_setpoint(1))) {
 			// vehicle is steady
-			_yawspeed_setpoint += _weathervane.getWeathervaneYawrate();
+			_yawspeed_setpoint += _weathervane_yaw_handler->get_weathervane_yawrate();
 		}
 	}
 }

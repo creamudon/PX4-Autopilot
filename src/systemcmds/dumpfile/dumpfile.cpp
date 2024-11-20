@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file dumpfile.cpp
+ * @file dumpfile.c
  *
  * @author Anton Babushkin <anton.babushkin@me.com>
  */

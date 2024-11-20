@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file ActuatorEffectivenessRotors.cpp
+ * @file ActuatorEffectivenessRotors.hpp
  *
  * Actuator effectiveness computed from rotors position and orientation
  *
@@ -79,6 +79,8 @@ ActuatorEffectivenessRotors::ActuatorEffectivenessRotors(ModuleParams *parent, A
 		}
 	}
 
+	_count_handle = param_find("CA_ROTOR_COUNT");
+
 	updateParams();
 }
 
@@ -86,7 +88,14 @@ void ActuatorEffectivenessRotors::updateParams()
 {
 	ModuleParams::updateParams();
 
-	_geometry.num_rotors = math::min(NUM_ROTORS_MAX, static_cast<int>(_param_ca_rotor_count.get()));
+	int32_t count = 0;
+
+	if (param_get(_count_handle, &count) != 0) {
+		PX4_ERR("param_get failed");
+		return;
+	}
+
+	_geometry.num_rotors = count;
 
 	for (int i = 0; i < _geometry.num_rotors; ++i) {
 		Vector3f &position = _geometry.rotors[i].position;
@@ -147,7 +156,7 @@ ActuatorEffectivenessRotors::computeEffectivenessMatrix(const Geometry &geometry
 {
 	int num_actuators = 0;
 
-	for (int i = 0; i < geometry.num_rotors; i++) {
+	for (int i = 0; i < math::min(NUM_ROTORS_MAX, geometry.num_rotors); i++) {
 
 		if (i + actuator_start_index >= NUM_ACTUATORS) {
 			break;
@@ -203,32 +212,15 @@ ActuatorEffectivenessRotors::computeEffectivenessMatrix(const Geometry &geometry
 			effectiveness(j, i + actuator_start_index) = moment(j);
 			effectiveness(j + 3, i + actuator_start_index) = thrust(j);
 		}
-
-		if (geometry.yaw_by_differential_thrust_disabled) {
-			// set yaw effectiveness to 0 if yaw is controlled by other means (e.g. tilts)
-			effectiveness(2, i + actuator_start_index) = 0.f;
-		}
-
-		if (geometry.three_dimensional_thrust_disabled) {
-			// Special case tiltrotor: instead of passing a 3D thrust vector (that would mostly have a x-component in FW, and z in MC),
-			// pass the vector magnitude as z-component, plus the collective tilt. Passing 3D thrust plus tilt is not feasible as they
-			// can't be allocated independently, and with the current controller it's not possible to have collective tilt calculated
-			// by the allocator directly.
-
-			effectiveness(0 + 3, i + actuator_start_index) = 0.f;
-			effectiveness(1 + 3, i + actuator_start_index) = 0.f;
-			effectiveness(2 + 3, i + actuator_start_index) = -ct;
-		}
 	}
 
 	return num_actuators;
 }
 
-uint32_t ActuatorEffectivenessRotors::updateAxisFromTilts(const ActuatorEffectivenessTilts &tilts,
-		float collective_tilt_control)
+uint32_t ActuatorEffectivenessRotors::updateAxisFromTilts(const ActuatorEffectivenessTilts &tilts, float tilt_control)
 {
-	if (!PX4_ISFINITE(collective_tilt_control)) {
-		collective_tilt_control = -1.f;
+	if (!PX4_ISFINITE(tilt_control)) {
+		tilt_control = -1.f;
 	}
 
 	uint32_t nontilted_motors = 0;
@@ -242,8 +234,8 @@ uint32_t ActuatorEffectivenessRotors::updateAxisFromTilts(const ActuatorEffectiv
 		}
 
 		const ActuatorEffectivenessTilts::Params &tilt = tilts.config(tilt_index);
-		const float tilt_angle = math::lerp(tilt.min_angle, tilt.max_angle, (collective_tilt_control + 1.f) / 2.f);
-		const float tilt_direction = math::radians((float)tilt.tilt_direction);
+		float tilt_angle = math::lerp(tilt.min_angle, tilt.max_angle, (tilt_control + 1.f) / 2.f);
+		float tilt_direction = math::radians((float)tilt.tilt_direction);
 		_geometry.rotors[i].axis = tiltedAxis(tilt_angle, tilt_direction);
 	}
 
@@ -254,17 +246,6 @@ Vector3f ActuatorEffectivenessRotors::tiltedAxis(float tilt_angle, float tilt_di
 {
 	Vector3f axis{0.f, 0.f, -1.f};
 	return Dcmf{Eulerf{0.f, -tilt_angle, tilt_direction}} * axis;
-}
-
-uint32_t ActuatorEffectivenessRotors::getMotors() const
-{
-	uint32_t motors = 0;
-
-	for (int i = 0; i < _geometry.num_rotors; ++i) {
-		motors |= 1u << i;
-	}
-
-	return motors;
 }
 
 uint32_t ActuatorEffectivenessRotors::getUpwardsMotors() const
@@ -280,30 +261,4 @@ uint32_t ActuatorEffectivenessRotors::getUpwardsMotors() const
 	}
 
 	return upwards_motors;
-}
-
-uint32_t ActuatorEffectivenessRotors::getForwardsMotors() const
-{
-	uint32_t forward_motors = 0;
-
-	for (int i = 0; i < _geometry.num_rotors; ++i) {
-		const Vector3f &axis = _geometry.rotors[i].axis;
-
-		if (axis(0) > 0.5f && fabsf(axis(1)) < 0.1f && fabsf(axis(2)) < 0.1f) {
-			forward_motors |= 1u << i;
-		}
-	}
-
-	return forward_motors;
-}
-
-bool
-ActuatorEffectivenessRotors::getEffectivenessMatrix(Configuration &configuration,
-		EffectivenessUpdateReason external_update)
-{
-	if (external_update == EffectivenessUpdateReason::NO_EXTERNAL_UPDATE) {
-		return false;
-	}
-
-	return addActuators(configuration);
 }

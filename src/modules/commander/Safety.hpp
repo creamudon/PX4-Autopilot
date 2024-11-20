@@ -40,24 +40,25 @@
 #include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/topics/button_event.h>
+#include <uORB/topics/safety.h>
 
 class Safety
 {
+
 public:
+
 	Safety();
 	~Safety() = default;
 
-	bool safetyButtonHandler();
-	void activateSafety();
-	bool isButtonAvailable() const { return _button_available; }
-	bool isSafetyOff() const { return _safety_off; }
-	bool isSafetyDisabled() const { return _safety_disabled; }
+	void safetyButtonHandler();
+	void enableSafety();
 
 private:
-	uORB::Subscription _safety_button_sub{ORB_ID::safety_button};
 
-	bool _button_available{false};///< Set to true if a safety button is connected
-	bool _safety_off{false}; ///< Set to true if safety is off
-	bool _previous_safety_off{false}; ///< Previous safety value
-	bool _safety_disabled{false}; ///< Set to true if safety is disabled
+	uORB::Subscription _safety_button_sub{ORB_ID::safety_button};
+	uORB::Publication<safety_s>	_safety_pub{ORB_ID(safety)};
+
+	safety_s _safety{};
+	bool _safety_disabled{false};
+	bool _previous_safety_off{false};
 };

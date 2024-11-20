@@ -5,14 +5,13 @@
 
 set HAVE_PM2 yes
 
-if mft query -q -k MFT -s MFT_PM2 -v 0
+if ver hwtypecmp V5X50 V5X51 V5X52
 then
 	set HAVE_PM2 no
 fi
 if param compare -s ADC_ADS1115_EN 1
 then
 	ads1115 start -X
-	board_adc start -n
 else
 	board_adc start
 fi
@@ -49,11 +48,34 @@ then
 	fi
 fi
 
-if ver hwbasecmp 008 009 00a 010 011
+if ver hwtypecmp V5X00 V5X01 V5X02 V5X10 V5X40 V5X41 V5X42 V5X51 V5X52
 then
+	#FMUv5Xbase board orientation
+
+	if ver hwtypecmp V5X00 V5X01 V5X40 V5X41 V5X51
+	then
+		# Internal SPI BMI088
+		bmi088 -A -R 4 -s start
+		bmi088 -G -R 4 -s start
+	else
+		# Internal SPI bus ICM20649
+		icm20649 -s -R 6 start
+	fi
+
+	# Internal SPI bus ICM42688p
+	icm42688p -R 6 -s start
+
+	# Internal SPI bus ICM-20602 (hard-mounted)
+	icm20602 -R 10 -s start
+
+	# Internal magnetometer on I2c
+	bmm150 -I start
+
+else
 	#SKYNODE base fmu board orientation
 
-	if ver hwtypecmp V5X000 V5X001
+	# V5X010001 ommited because not representable in this hardware format
+	if ver hwtypecmp V5X90 V5X91 V5Xa0 V5Xa1 V5X80 V5X81 
 	then
 		# Internal SPI BMI088
 		bmi088 -A -R 2 -s start
@@ -72,30 +94,6 @@ then
 	# Internal magnetometer on I2c
 	bmm150 -I -R 6 start
 
-	# Auto start power monitors
-	pm_selector_auterion start
-
-else
-	#FMUv5Xbase board orientation
-
-	if ver hwtypecmp V5X000 V5X001
-	then
-		# Internal SPI BMI088
-		bmi088 -A -R 4 -s start
-		bmi088 -G -R 4 -s start
-	else
-		# Internal SPI bus ICM20649
-		icm20649 -s -R 6 start
-	fi
-
-	# Internal SPI bus ICM42688p
-	icm42688p -R 6 -s start
-
-	# Internal SPI bus ICM-20602 (hard-mounted)
-	icm20602 -R 10 -s start
-
-	# Internal magnetometer on I2c
-	bmm150 -I start
 fi
 
 # External compass on GPS1/I2C1 (the 3rd external bus): standard Holybro Pixhawk 4 or CUAV V5 GPS/compass puck (with lights, safety button, and buzzer)
@@ -107,7 +105,7 @@ ist8310 -X -b 1 -R 10 start
 if param compare SENS_INT_BARO_EN 1
 then
 	bmp388 -I -a 0x77 start
-	if ver hwtypecmp V5X000
+	if ver hwtypecmp V5X00 V5X10 V5X80 V5X90 V5Xa0
 	then
 		bmp388 -I start
 	else

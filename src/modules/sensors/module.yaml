@@ -14,7 +14,6 @@ parameters:
             category: System
             type: int32
             default: 0
-            decimal: 3
             num_instances: *max_num_sensor_instances
             instance_start: 0
 
@@ -32,7 +31,6 @@ parameters:
                 75: High
                 100: Max
             default: -1
-            decimal: 3
             num_instances: *max_num_sensor_instances
             instance_start: 0
 
@@ -98,8 +96,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m/s^2
-            decimal: 3
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -110,8 +107,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m/s^2
-            decimal: 3
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -122,8 +118,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m/s^2
-            decimal: 3
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -134,7 +129,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -147,7 +141,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -160,7 +153,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -201,7 +193,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             #unit: Pa
             volatile: true
             num_instances: *max_num_sensor_instances
@@ -297,8 +288,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: rad/s
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -309,8 +299,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: rad/s
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -321,8 +310,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: rad/s
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -360,7 +348,6 @@ parameters:
                 short: Magnetometer ${i} rotation relative to airframe
                 long: |
                     An internal sensor will force a value of -1, so a GCS should only attempt to configure the rotation if the value is greater than or equal to zero.
-                    Set to "Custom Euler Angle" to define the rotation using CAL_MAG${i}_ROLL, CAL_MAG${i}_PITCH and CAL_MAG${i}_YAW.
             category: System
             type: enum
             values:
@@ -406,49 +393,9 @@ parameters:
                 38: Roll 90°, Pitch 68°, Yaw 293°
                 39: Pitch 315°
                 40: Roll 90°, Pitch 315°
-                100: Custom Euler Angle
             min: -1
-            max: 100
+            max: 40
             default: -1
-            num_instances: *max_num_sensor_instances
-            instance_start: 0
-
-        CAL_MAG${i}_ROLL:
-            description:
-                short: Magnetometer ${i} Custom Euler Roll Angle
-                long: Setting this parameter changes CAL_MAG${i}_ROT to "Custom Euler Angle"
-            category: System
-            type: float
-            default: 0.0
-            min: -180
-            max: 180
-            unit: deg
-            num_instances: *max_num_sensor_instances
-            instance_start: 0
-
-        CAL_MAG${i}_PITCH:
-            description:
-                short: Magnetometer ${i} Custom Euler Pitch Angle
-                long: Setting this parameter changes CAL_MAG${i}_ROT to "Custom Euler Angle"
-            category: System
-            type: float
-            default: 0.0
-            min: -180
-            max: 180
-            unit: deg
-            num_instances: *max_num_sensor_instances
-            instance_start: 0
-
-        CAL_MAG${i}_YAW:
-            description:
-                short: Magnetometer ${i} Custom Euler Yaw Angle
-                long: Setting this parameter changes CAL_MAG${i}_ROT to "Custom Euler Angle"
-            category: System
-            type: float
-            default: 0.0
-            min: -180
-            max: 180
-            unit: deg
             num_instances: *max_num_sensor_instances
             instance_start: 0
 
@@ -458,8 +405,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: gauss
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -470,8 +416,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: gauss
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -482,8 +427,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
-            unit: gauss
+            unit: m
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -494,7 +438,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -507,7 +450,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -520,7 +462,6 @@ parameters:
             category: System
             type: float
             default: 1.0
-            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -533,7 +474,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -544,7 +484,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -571,7 +510,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -588,7 +526,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -605,7 +542,6 @@ parameters:
             category: System
             type: float
             default: 0.0
-            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0

@@ -7,8 +7,6 @@ namespace sensor
 
 Vio::Vio(std::shared_ptr<Ekf> ekf): Sensor(ekf)
 {
-	_vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_FRD;
-	_vio_data.pos_frame = PositionFrame::LOCAL_FRAME_FRD;
 }
 
 Vio::~Vio()
@@ -28,17 +26,22 @@ void Vio::setData(const extVisionSample &vio_data)
 
 void Vio::setVelocityVariance(const Vector3f &velVar)
 {
-	_vio_data.velocity_var = velVar;
+	setVelocityCovariance(matrix::diag(velVar));
+}
+
+void Vio::setVelocityCovariance(const Matrix3f &velCov)
+{
+	_vio_data.velCov = velCov;
 }
 
 void Vio::setPositionVariance(const Vector3f &posVar)
 {
-	_vio_data.position_var = posVar;
+	_vio_data.posVar = posVar;
 }
 
 void Vio::setAngularVariance(float angVar)
 {
-	_vio_data.orientation_var(2) = angVar;
+	_vio_data.angVar = angVar;
 }
 
 void Vio::setVelocity(const Vector3f &vel)
@@ -58,40 +61,24 @@ void Vio::setOrientation(const Quatf &quat)
 
 void Vio::setVelocityFrameToBody()
 {
-	_vio_data.vel_frame = VelocityFrame::BODY_FRAME_FRD;
+	_vio_data.vel_frame = velocity_frame_t::BODY_FRAME_FRD;
 }
 
-void Vio::setVelocityFrameToLocalFRD()
+void Vio::setVelocityFrameToLocal()
 {
-	_vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_FRD;
-}
-
-void Vio::setVelocityFrameToLocalNED()
-{
-	_vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_NED;
-}
-
-void Vio::setPositionFrameToLocalNED()
-{
-	_vio_data.pos_frame = PositionFrame::LOCAL_FRAME_NED;
-}
-
-void Vio::setPositionFrameToLocalFRD()
-{
-	_vio_data.pos_frame = PositionFrame::LOCAL_FRAME_FRD;
+	_vio_data.vel_frame = velocity_frame_t::LOCAL_FRAME_FRD;
 }
 
 extVisionSample Vio::dataAtRest()
 {
 	extVisionSample vio_data;
-	vio_data.pos = Vector3f{0.0f, 0.0f, 0.0f};
-	vio_data.vel = Vector3f{0.0f, 0.0f, 0.0f};
+	vio_data.pos = Vector3f{0.0f, 0.0f, 0.0f};;
+	vio_data.vel = Vector3f{0.0f, 0.0f, 0.0f};;
 	vio_data.quat = Quatf{1.0f, 0.0f, 0.0f, 0.0f};
-	vio_data.position_var = Vector3f{0.1f, 0.1f, 0.1f};
-	vio_data.velocity_var = Vector3f{0.1f, 0.1f, 0.1f};
-	vio_data.orientation_var(2) = 0.05f;
-	vio_data.vel_frame = VelocityFrame::LOCAL_FRAME_FRD;
-	vio_data.pos_frame = PositionFrame::LOCAL_FRAME_FRD;
+	vio_data.posVar = Vector3f{0.1f, 0.1f, 0.1f};
+	vio_data.velCov = matrix::eye<float, 3>() * 0.1f;
+	vio_data.angVar = 0.05f;
+	vio_data.vel_frame = velocity_frame_t::LOCAL_FRAME_FRD;
 	return vio_data;
 }
 

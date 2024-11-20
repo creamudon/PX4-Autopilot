@@ -60,7 +60,7 @@ public:
 		FixedUpwards, ///< axis is fixed, pointing upwards (negative Z)
 	};
 
-	static constexpr int NUM_ROTORS_MAX = 12;
+	static constexpr int NUM_ROTORS_MAX = 8;
 
 	struct RotorGeometry {
 		matrix::Vector3f position;
@@ -74,16 +74,12 @@ public:
 		RotorGeometry rotors[NUM_ROTORS_MAX];
 		int num_rotors{0};
 		bool propeller_torque_disabled{false};
-		bool yaw_by_differential_thrust_disabled{false};
 		bool propeller_torque_disabled_non_upwards{false}; ///< keeps propeller torque enabled for upward facing motors
-		bool three_dimensional_thrust_disabled{false}; ///< for handling of tiltrotor VTOL, as they pass in 1D thrust and collective tilt
 	};
 
 	ActuatorEffectivenessRotors(ModuleParams *parent, AxisConfiguration axis_config = AxisConfiguration::Configurable,
 				    bool tilt_support = false);
 	virtual ~ActuatorEffectivenessRotors() = default;
-
-	bool getEffectivenessMatrix(Configuration &configuration, EffectivenessUpdateReason external_update) override;
 
 	void getDesiredAllocationMethod(AllocationMethod allocation_method_out[MAX_NUM_MATRICES]) const override
 	{
@@ -100,7 +96,7 @@ public:
 
 	bool addActuators(Configuration &configuration);
 
-	const char *name() const override { return "Rotors"; }
+	const char *name() const override { return "Multirotor"; }
 
 	/**
 	 * Sets the motor axis from tilt configurations and current tilt control.
@@ -120,15 +116,9 @@ public:
 
 	void enablePropellerTorque(bool enable) { _geometry.propeller_torque_disabled = !enable; }
 
-	void enableYawByDifferentialThrust(bool enable) { _geometry.yaw_by_differential_thrust_disabled = !enable; }
-
 	void enablePropellerTorqueNonUpwards(bool enable) { _geometry.propeller_torque_disabled_non_upwards = !enable; }
 
-	void enableThreeDimensionalThrust(bool enable) { _geometry.three_dimensional_thrust_disabled = !enable; }
-
-	uint32_t getMotors() const;
 	uint32_t getUpwardsMotors() const;
-	uint32_t getForwardsMotors() const;
 
 private:
 	void updateParams() override;
@@ -147,10 +137,7 @@ private:
 		param_t tilt_index;
 	};
 	ParamHandles _param_handles[NUM_ROTORS_MAX];
+	param_t _count_handle;
 
 	Geometry _geometry{};
-
-	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::CA_ROTOR_COUNT>) _param_ca_rotor_count
-	)
 };

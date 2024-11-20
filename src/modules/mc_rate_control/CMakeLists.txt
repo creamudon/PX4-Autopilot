@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+add_subdirectory(RateControl)
+
 px4_add_module(
 	MODULE modules__mc_rate_control
 	MAIN mc_rate_control

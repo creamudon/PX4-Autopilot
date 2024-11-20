@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file timestamped_list.h
+ * @file timestamped list.h
  * Fixed size list with timestamps.
  *
  * The list has a fixed size that is set at instantiation and is based
@@ -49,12 +49,20 @@
 /**
  * @class TimestampedList
  */
-template <class T, int NUM_ITEMS>
+template <class T>
 class TimestampedList
 {
 public:
-	TimestampedList() = default;
-	~TimestampedList() = default;
+	TimestampedList(int num_items)
+	{
+		_list = new item_s[num_items];
+		_list_len = num_items;
+	}
+
+	~TimestampedList()
+	{
+		delete[] _list;
+	}
 
 	/**
 	 * Insert a value into the list, overwrite the oldest entry if full.
@@ -64,7 +72,7 @@ public:
 		hrt_abstime now = hrt_absolute_time();
 
 		// Insert it wherever there is a free space.
-		for (int i = 0; i < NUM_ITEMS; ++i) {
+		for (int i = 0; i < _list_len; ++i) {
 			if (_list[i].timestamp_us == 0) {
 				_list[i].timestamp_us = now;
 				_list[i].value = new_value;
@@ -75,7 +83,7 @@ public:
 		// Find oldest entry.
 		int oldest_i = 0;
 
-		for (int i = 1; i < NUM_ITEMS; ++i) {
+		for (int i = 1; i < _list_len; ++i) {
 			if (_list[i].timestamp_us < _list[oldest_i].timestamp_us) {
 				oldest_i = i;
 			}
@@ -105,7 +113,7 @@ public:
 		// Increment first, then leave it until called again.
 		++_current_i;
 
-		for (int i = _current_i; i < NUM_ITEMS; ++i) {
+		for (int i = _current_i; i < _list_len; ++i) {
 			if (_list[i].timestamp_us != 0) {
 				_current_i = i;
 				return &_list[i].value;
@@ -120,7 +128,7 @@ public:
 	 */
 	void drop_current()
 	{
-		if (_current_i < NUM_ITEMS) {
+		if (_current_i < _list_len) {
 			_list[_current_i].timestamp_us = 0;
 		}
 	}
@@ -130,18 +138,22 @@ public:
 	 */
 	void update_current()
 	{
-		if (_current_i < NUM_ITEMS) {
+		if (_current_i < _list_len) {
 			_list[_current_i].timestamp = hrt_absolute_time();
 		}
 	}
 
+	/* do not allow copying or assigning this class */
+	TimestampedList(const TimestampedList &) = delete;
+	TimestampedList operator=(const TimestampedList &) = delete;
+
 private:
 	struct item_s {
 		hrt_abstime timestamp_us = 0; // 0 signals inactive.
-		T value{};
+		T value;
 	};
 
-	item_s _list[NUM_ITEMS] {};
-
-	int _current_i{-1};
+	item_s *_list = nullptr;
+	int _list_len = 0;
+	int _current_i = -1;
 };

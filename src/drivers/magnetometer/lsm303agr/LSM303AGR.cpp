@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file LSM303AGR.cpp
+ * @file LSM303agr.cpp
  * Driver for the ST LSM303AGR MEMS accelerometer / magnetometer connected via SPI.
  * NOTE: currently only the mag is implemented
  */

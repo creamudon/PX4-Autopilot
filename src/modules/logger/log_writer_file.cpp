@@ -41,12 +41,9 @@
 #include <mathlib/mathlib.h>
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/crypto.h>
-#include <px4_platform_common/log.h>
-
-#if defined(__PX4_NUTTX)
-# include <malloc.h>
-# include <systemlib/hardfault_log.h>
-#endif // __PX4_NUTTX
+#ifdef __PX4_NUTTX
+#include <systemlib/hardfault_log.h>
+#endif /* __PX4_NUTTX */
 
 using namespace time_literals;
 
@@ -62,13 +59,11 @@ LogWriterFile::LogWriterFile(size_t buffer_size)
 	//We always write larger chunks (orb messages) to the buffer, so the buffer
 	//needs to be larger than the minimum write chunk (300 is somewhat arbitrary)
 	{
-		buffer_size,
-		_min_write_chunk + 300,
+		math::max(buffer_size, _min_write_chunk + 300),
 		perf_alloc(PC_ELAPSED, "logger_sd_write"), perf_alloc(PC_ELAPSED, "logger_sd_fsync")},
 
 	{
 		300, // buffer size for the mission log (can be kept fairly small)
-		1,
 		perf_alloc(PC_ELAPSED, "logger_sd_write_mission"), perf_alloc(PC_ELAPSED, "logger_sd_fsync_mission")}
 }
 {
@@ -215,7 +210,7 @@ bool LogWriterFile::init_logfile_encryption(const char *filename)
 #endif // PX4_CRYPTO
 
 
-bool LogWriterFile::start_log(LogType type, const char *filename)
+void LogWriterFile::start_log(LogType type, const char *filename)
 {
 	// At this point we don't expect the file to be open, but it can happen for very fast consecutive stop & start
 	// calls. In that case we wait for the thread to close the file first.
@@ -247,7 +242,7 @@ bool LogWriterFile::start_log(LogType type, const char *filename)
 	if (!enc_init) {
 		PX4_ERR("Failed to start encrypted logging");
 		_crypto.close();
-		return false;
+		return;
 	}
 
 #endif
@@ -255,10 +250,7 @@ bool LogWriterFile::start_log(LogType type, const char *filename)
 	if (_buffers[(int)type].start_log(filename)) {
 		PX4_INFO("Opened %s log file: %s", log_type_str(type), filename);
 		notify();
-		return true;
 	}
-
-	return false;
 }
 
 int LogWriterFile::hardfault_store_filename(const char *log_file)
@@ -376,8 +368,7 @@ void LogWriterFile::run()
 			const hrt_abstime now = hrt_absolute_time();
 
 			/* call fsync periodically to minimize potential loss of data */
-			const bool call_fsync = ++poll_count >= 100 || now - last_fsync > 1_s || _want_fsync.load();
-			_want_fsync.store(false);
+			const bool call_fsync = ++poll_count >= 100 || now - last_fsync > 1_s;
 
 			if (call_fsync) {
 				last_fsync = now;
@@ -451,20 +442,13 @@ void LogWriterFile::run()
 
 						if (!buffer._should_run && written == static_cast<int>(available) && !is_part) {
 							/* Stop only when all data written */
-							pthread_mutex_unlock(&_mtx);
 							buffer.close_file();
-							pthread_mutex_lock(&_mtx);
-							buffer.reset();
 						}
 
 					} else {
 						PX4_ERR("write failed (%i)", errno);
-						buffer._had_write_error.store(true);
 						buffer._should_run = false;
-						pthread_mutex_unlock(&_mtx);
 						buffer.close_file();
-						pthread_mutex_lock(&_mtx);
-						buffer.reset();
 					}
 
 				} else if (call_fsync && buffer._should_run) {
@@ -473,10 +457,7 @@ void LogWriterFile::run()
 					pthread_mutex_lock(&_mtx);
 
 				} else if (available == 0 && !buffer._should_run) {
-					pthread_mutex_unlock(&_mtx);
 					buffer.close_file();
-					pthread_mutex_lock(&_mtx);
-					buffer.reset();
 				}
 
 				/* if split into 2 parts, write the second part immediately as well */
@@ -594,12 +575,9 @@ const char *log_type_str(LogType type)
 	return "unknown";
 }
 
-LogWriterFile::LogFileBuffer::LogFileBuffer(size_t log_buffer_desired_size, size_t log_buffer_min_size,
-		perf_counter_t perf_write, perf_counter_t perf_fsync) :
-	_buffer_size(log_buffer_desired_size),
-	_buffer_size_min(log_buffer_min_size),
-	_perf_write(perf_write),
-	_perf_fsync(perf_fsync)
+LogWriterFile::LogFileBuffer::LogFileBuffer(size_t log_buffer_size, perf_counter_t perf_write,
+		perf_counter_t perf_fsync)
+	: _buffer_size(log_buffer_size), _perf_write(perf_write), _perf_fsync(perf_fsync)
 {
 }
 
@@ -659,7 +637,6 @@ size_t LogWriterFile::LogFileBuffer::get_read_ptr(void **ptr, bool *is_part)
 bool LogWriterFile::LogFileBuffer::start_log(const char *filename)
 {
 	_fd = ::open(filename, O_CREAT | O_WRONLY, PX4_O_MODE_666);
-	_had_write_error.store(false);
 
 	if (_fd < 0) {
 		PX4_ERR("Can't open log file %s, errno: %d", filename, errno);
@@ -667,25 +644,6 @@ bool LogWriterFile::LogFileBuffer::start_log(const char *filename)
 	}
 
 	if (_buffer == nullptr) {
-		_buffer_size = math::max(_buffer_size, _buffer_size_min);
-
-#if defined(__PX4_NUTTX)
-		struct mallinfo alloc_info = mallinfo();
-
-		// reduced to largest available free chunk, but leave at least 1 kB available
-		static constexpr ssize_t one_kb = 1024;
-		const ssize_t reduced_buffer_size = math::max((alloc_info.mxordblk - one_kb) / one_kb * one_kb,
-						    (ssize_t)_buffer_size_min);
-
-		if ((reduced_buffer_size > 0) && ((ssize_t)_buffer_size > reduced_buffer_size)) {
-			PX4_WARN("requested buffer size %dB limited to available %dB (available plus 1 kB margin)",
-				 _buffer_size, reduced_buffer_size);
-
-			_buffer_size = reduced_buffer_size;
-		}
-
-#endif // __PX4_NUTTX
-
 		_buffer = (uint8_t *) px4_cache_aligned_alloc(_buffer_size);
 
 		if (_buffer == nullptr) {
@@ -728,8 +686,12 @@ ssize_t LogWriterFile::LogFileBuffer::write_to_file(const void *buffer, size_t s
 
 void LogWriterFile::LogFileBuffer::close_file()
 {
+	_head = 0;
+	_count = 0;
+
 	if (_fd >= 0) {
 		int res = close(_fd);
+		_fd = -1;
 
 		if (res) {
 			PX4_WARN("closing log file failed (%i)", errno);
@@ -738,13 +700,6 @@ void LogWriterFile::LogFileBuffer::close_file()
 			PX4_INFO("closed logfile, bytes written: %zu", _total_written);
 		}
 	}
-}
-
-void LogWriterFile::LogFileBuffer::reset()
-{
-	_head = 0;
-	_count = 0;
-	_fd = -1;
 }
 
 }

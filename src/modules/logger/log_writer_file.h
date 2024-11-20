@@ -79,7 +79,7 @@ public:
 
 	void thread_stop();
 
-	bool start_log(LogType type, const char *filename);
+	void start_log(LogType type, const char *filename);
 
 	void stop_log(LogType type);
 
@@ -120,10 +120,6 @@ public:
 
 	void set_need_reliable_transfer(bool need_reliable)
 	{
-		if (!need_reliable && _need_reliable_transfer) {
-			_want_fsync.store(true);
-		}
-
 		_need_reliable_transfer = need_reliable;
 	}
 
@@ -131,8 +127,6 @@ public:
 	{
 		return _need_reliable_transfer;
 	}
-
-	bool had_write_error() const { return _buffers[(int)LogType::Full]._had_write_error.load(); }
 
 	pthread_t thread_id() const { return _thread; }
 
@@ -169,16 +163,13 @@ private:
 	class LogFileBuffer
 	{
 	public:
-		LogFileBuffer(size_t log_buffer_desired_size, size_t log_buffer_min_size,
-			      perf_counter_t perf_write, perf_counter_t perf_fsync);
+		LogFileBuffer(size_t log_buffer_size, perf_counter_t perf_write, perf_counter_t perf_fsync);
 
 		~LogFileBuffer();
 
 		bool start_log(const char *filename);
 
 		void close_file();
-
-		void reset();
 
 		size_t get_read_ptr(void **ptr, bool *is_part);
 
@@ -202,10 +193,8 @@ private:
 		size_t count() const { return _count; }
 
 		bool _should_run = false;
-		px4::atomic_bool _had_write_error{false};
 	private:
-		size_t _buffer_size;
-		const size_t _buffer_size_min;
+		const size_t _buffer_size;
 		int	_fd = -1;
 		uint8_t *_buffer = nullptr;
 		size_t _head = 0; ///< next position to write to
@@ -219,7 +208,6 @@ private:
 
 	px4::atomic_bool	_exit_thread{false};
 	bool			_need_reliable_transfer{false};
-	px4::atomic_bool	_want_fsync{false};
 	pthread_mutex_t		_mtx;
 	pthread_cond_t		_cv;
 	pthread_t _thread = 0;

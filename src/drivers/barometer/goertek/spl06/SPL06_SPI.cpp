@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file SPL06_SPI.cpp
+ * @file spl06_spi.cpp
  *
  * SPI interface for Goertek SPL06
  */
